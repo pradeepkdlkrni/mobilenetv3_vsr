@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <!-- Background layout sketch -->
+  <rect width="800" height="600" fill="#f8f8f8"/>
+  
+  <!-- Environment structures -->
+  <rect x="50" y="50" width="700" height="500" fill="#e9e9e9" stroke="#999" stroke-width="2"/>
+  <rect x="100" y="130" width="250" height="320" fill="#d0d0d0" stroke="#999" stroke-width="2" fill-opacity="0.5"/>
+  <rect x="450" y="130" width="250" height="320" fill="#d0d0d0" stroke="#999" stroke-width="2" fill-opacity="0.5"/>
+  <rect x="50" y="50" width="700" height="80" fill="#d0d0d0" stroke="#999" stroke-width="2"/>
+  
+  <!-- Path visualization -->
+  <path d="M120,300 C180,250 240,280 300,320 C350,350 420,330 480,280 C540,230 600,250 680,290" 
+        fill="none" stroke="#3366cc" stroke-width="4" stroke-dasharray="8,4"/>
+  
+  <!-- Position markers for frames -->
+  <circle cx="120" cy="300" r="10" fill="#cc3366"/>
+  <text x="120" y="280" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F1</text>
+  
+  <circle cx="180" cy="250" r="10" fill="#cc3366"/>
+  <text x="180" y="230" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F3</text>
+  
+  <circle cx="240" cy="280" r="10" fill="#cc3366"/>
+  <text x="240" y="260" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F5</text>
+  
+  <circle cx="300" cy="320" r="10" fill="#cc3366"/>
+  <text x="300" y="300" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F7</text>
+  
+  <circle cx="350" cy="350" r="10" fill="#cc3366"/>
+  <text x="350" y="330" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F9</text>
+  
+  <circle cx="420" cy="330" r="10" fill="#cc3366"/>
+  <text x="420" y="310" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F11</text>
+  
+  <circle cx="480" cy="280" r="10" fill="#cc3366"/>
+  <text x="480" y="260" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F12</text>
+  
+  <circle cx="540" cy="230" r="10" fill="#cc3366"/>
+  <text x="540" y="210" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F13</text>
+  
+  <circle cx="600" cy="250" r="10" fill="#cc3366"/>
+  <text x="600" y="230" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F14</text>
+  
+  <circle cx="680" cy="290" r="10" fill="#cc3366"/>
+  <text x="680" y="270" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">F15</text>
+  
+  <!-- Legend -->
+  <rect x="600" y="480" width="120" height="50" fill="#ffffff" stroke="#999" stroke-width="1"/>
+  <line x1="610" y1="495" x2="640" y2="495" stroke="#3366cc" stroke-width="4" stroke-dasharray="8,4"/>
+  <circle cx="625" cy="515" r="6" fill="#cc3366"/>
+  <text x="650" y="500" font-family="Arial" font-size="12" fill="#000">Movement Path</text>
+  <text x="650" y="520" font-family="Arial" font-size="12" fill="#000">Frame Position</text>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold" fill="#000">Subject Movement Tracking Map</text>
+</svg>
