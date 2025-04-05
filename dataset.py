@@ -1,22 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar  1 15:00:01 2025
-
-@author: prade
-"""
-
 import os
 import torch
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
-
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar  1 15:00:01 2025
-
-@author: prade
-"""
 
 class VideoDataset(Dataset):
     def __init__(self, lr_folder, hr_folder, sequence_length=5, transform=None):
@@ -24,137 +10,100 @@ class VideoDataset(Dataset):
         self.hr_folder = hr_folder
         self.sequence_length = sequence_length
         self.transform = transform
+        
+        # For Vimeo septuplet structure: 
+        # F://vimeo_septuplet_full//Arranged//train//lr//00001_0003//frame_00001.png
 
-        # Get sorted list of all LR and HR images
-        # Check if the folder contains subdirectories
-        if any(os.path.isdir(os.path.join(lr_folder, f)) for f in os.listdir(lr_folder)):
-            # Handle directory structure with video subdirectories
-            self.use_subdirs = True
-            self.video_folders = sorted([f for f in os.listdir(lr_folder) if os.path.isdir(os.path.join(lr_folder, f))])
+        # Get video sequence folders (00001_0003, etc.)
+        self.sequence_folders = sorted([f for f in os.listdir(lr_folder) 
+                                     if os.path.isdir(os.path.join(lr_folder, f))])
+        
+        if len(self.sequence_folders) == 0:
+            raise ValueError(f"No subdirectories found in {lr_folder}. Check your path.")
             
-            # Create index mapping for efficient retrieval
-            self.frame_indices = []
-            for video_idx, video_name in enumerate(self.video_folders):
-                lr_video_path = os.path.join(lr_folder, video_name)
-                num_frames = len([f for f in os.listdir(lr_video_path) if f.endswith('.png')])
+        print(f"Found {len(self.sequence_folders)} sequence folders in {lr_folder}")
+        
+        # Create mapping for efficient retrieval
+        self.valid_sequences = []
+        
+        for seq_folder in self.sequence_folders:
+            lr_seq_path = os.path.join(lr_folder, seq_folder)
+            hr_seq_path = os.path.join(hr_folder, seq_folder)
+            
+            # Ensure both LR and HR folders for this sequence exist
+            if not os.path.exists(hr_seq_path):
+                print(f"Warning: HR folder {hr_seq_path} does not exist, skipping sequence {seq_folder}")
+                continue
                 
-                # For each valid sequence starting point
-                for start_idx in range(num_frames - sequence_length + 1):
-                    self.frame_indices.append((video_idx, start_idx))
+            # Get frames in this sequence
+            lr_frames = sorted([f for f in os.listdir(lr_seq_path) if f.endswith('.png') or f.endswith('.jpg')])
+            hr_frames = sorted([f for f in os.listdir(hr_seq_path) if f.endswith('.png') or f.endswith('.jpg')])
             
-            #print(f"Found {len(self.video_folders)} video folders")
-            #print(f"Total sequences available: {len(self.frame_indices)}")
-        else:
-            # Handle flat structure with all frames in one directory
-            self.use_subdirs = False
-            self.lr_frames = sorted([f for f in os.listdir(lr_folder) if f.endswith('.png')])
-            self.hr_frames = sorted([f for f in os.listdir(hr_folder) if f.endswith('.png')])
-
-            #print(f"Found {len(self.lr_frames)} LR frames in {lr_folder}")
-            #print(f"Found {len(self.hr_frames)} HR frames in {hr_folder}")
-
-            # Ensure there are enough frames for sequence extraction
-            self.frame_indices = []
-            num_frames = len(self.lr_frames)
-
-            if num_frames < self.sequence_length:
-                print(f"Error: Not enough frames in {lr_folder}. Found {num_frames}, need {self.sequence_length}.")
-            else:
-                for start_idx in range(num_frames - sequence_length + 1):
-                    self.frame_indices.append(start_idx)
-
-            print(f"Total sequences available: {len(self.frame_indices)}")
+            # Check if there are enough frames for a sequence
+            if len(lr_frames) < sequence_length or len(hr_frames) < sequence_length:
+                continue
+                
+            # Store valid sequence
+            self.valid_sequences.append({
+                'folder': seq_folder,
+                'lr_frames': lr_frames[:sequence_length],  # Use first sequence_length frames
+                'hr_frames': hr_frames[:sequence_length]
+            })
+        
+        print(f"Total valid sequences: {len(self.valid_sequences)}")
+        
+        if len(self.valid_sequences) == 0:
+            raise ValueError(f"No valid sequences found that contain {sequence_length} frames in both LR and HR.")
 
     def __len__(self):
-        return len(self.frame_indices)
+        return len(self.valid_sequences)
 
     def __getitem__(self, idx):
-        if self.use_subdirs:
-            # Handle directory structure with video subdirectories
-            video_idx, start_idx = self.frame_indices[idx]
-            video_name = self.video_folders[video_idx]
+        sequence = self.valid_sequences[idx]
+        seq_folder = sequence['folder']
+        lr_frames_list = sequence['lr_frames']
+        hr_frames_list = sequence['hr_frames']
+        
+        # Load sequence of frames
+        lr_sequence = []
+        hr_sequence = []
+        
+        for i in range(self.sequence_length):
+            # Load LR frame
+            lr_path = os.path.join(self.lr_folder, seq_folder, lr_frames_list[i])
+            lr_frame = cv2.imread(lr_path)
+            if lr_frame is None:
+                raise ValueError(f"Could not read image at {lr_path}")
+            lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
             
-            lr_frames = []
-            hr_frames = []
+            # Load HR frame
+            hr_path = os.path.join(self.hr_folder, seq_folder, hr_frames_list[i])
+            hr_frame = cv2.imread(hr_path)
+            if hr_frame is None:
+                raise ValueError(f"Could not read image at {hr_path}")
+            hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
             
-            # Load sequence of frames
-            for i in range(self.sequence_length):
-                frame_idx = start_idx + i
-                if len(self.hr_frames) == 0:
-                    print(f"Warning: No HR frames found in {self.hr_folder}. Using placeholder HR frames.")
-                    hr_frame = torch.zeros((3, 64, 64))  # Placeholder tensor
+            # Apply transforms
+            if self.transform:
+                # Check if transform is a tuple of (lr_transform, hr_transform)
+                if isinstance(self.transform, tuple) and len(self.transform) == 2:
+                    lr_transform, hr_transform = self.transform
+                    lr_frame = lr_transform(lr_frame)
+                    hr_frame = hr_transform(hr_frame)
                 else:
-                    hr_path = os.path.join(self.hr_folder, self.hr_frames[frame_idx])
-                    hr_frame = cv2.imread(hr_path)
-                    hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
-                # Load LR frame
-                lr_path = os.path.join(self.lr_folder, video_name, f"{frame_idx:05d}.png")
-                lr_frame = cv2.imread(lr_path)
-                lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
-                
-                # Load HR frame
-               # hr_path = os.path.join(self.hr_folder, video_name, f"{frame_idx:05d}.png")
-               # hr_frame = cv2.imread(hr_path)
-               # hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
-                
-                # Apply transforms
-                if self.transform:
-                    # Check if transform is a tuple of (lr_transform, hr_transform)
-                    if isinstance(self.transform, tuple) and len(self.transform) == 2:
-                        lr_transform, hr_transform = self.transform
-                        lr_frame = lr_transform(lr_frame)
-                        hr_frame = hr_transform(hr_frame)
-                    else:
-                        # Apply the same transform to both
-                        lr_frame = self.transform(lr_frame)
-                        hr_frame = self.transform(hr_frame)
-                else:
-                    # Convert to tensor and normalize to [0, 1]
-                    lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
-                    hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
-                
-                lr_frames.append(lr_frame)
-                hr_frames.append(hr_frame)
-        else:
-            # Handle flat structure with all frames in one directory
-            start_idx = self.frame_indices[idx]
+                    # Apply the same transform to both
+                    lr_frame = self.transform(lr_frame)
+                    hr_frame = self.transform(hr_frame)
+            else:
+                # Convert to tensor and normalize to [0, 1]
+                lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
+                hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
             
-            # Load sequence of frames
-            lr_frames = []
-            hr_frames = []
-            
-            for i in range(self.sequence_length):
-                frame_idx = start_idx + i
-                lr_path = os.path.join(self.lr_folder, self.lr_frames[frame_idx])
-                hr_path = os.path.join(self.hr_folder, self.hr_frames[frame_idx])
-                
-                lr_frame = cv2.imread(lr_path)
-                lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
-                
-                hr_frame = cv2.imread(hr_path)
-                hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
-                
-                # Apply transforms
-                if self.transform:
-                    # Check if transform is a tuple of (lr_transform, hr_transform)
-                    if isinstance(self.transform, tuple) and len(self.transform) == 2:
-                        lr_transform, hr_transform = self.transform
-                        lr_frame = lr_transform(lr_frame)
-                        hr_frame = hr_transform(hr_frame)
-                    else:
-                        # Apply the same transform to both
-                        lr_frame = self.transform(lr_frame)
-                        hr_frame = self.transform(hr_frame)
-                else:
-                    # Convert to tensor and normalize to [0, 1]
-                    lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
-                    hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
-                
-                lr_frames.append(lr_frame)
-                hr_frames.append(hr_frame)
+            lr_sequence.append(lr_frame)
+            hr_sequence.append(hr_frame)
         
         # Stack frames into tensors
-        lr_sequence = torch.stack(lr_frames)
-        hr_sequence = torch.stack(hr_frames)
+        lr_sequence = torch.stack(lr_sequence)
+        hr_sequence = torch.stack(hr_sequence)
         
         return lr_sequence, hr_sequence

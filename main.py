@@ -115,41 +115,56 @@ def main():
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=LEARNING_RATE)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
 
+    # Define dataset paths
+    base_path = "F://vimeo_septuplet_full//Arranged_small//"
+    train_lr_path = os.path.join(base_path, "train", "lr")
+    train_hr_path = os.path.join(base_path, "train", "hr")
+    val_lr_path = os.path.join(base_path, "val", "lr")
+    val_hr_path = os.path.join(base_path, "val", "hr")
+    test_lr_path = os.path.join(base_path, "test", "lr")
+    test_hr_path = os.path.join(base_path, "test", "hr")
+    
+    # Verify paths exist
+    for path in [train_lr_path, train_hr_path, val_lr_path, val_hr_path, test_lr_path, test_hr_path]:
+        if not os.path.exists(path):
+            print(f"Warning: Path does not exist: {path}")
+    
     # Create datasets and dataloaders
     train_dataset = VideoDataset(
-    lr_folder="F://vimeo_mobilenetv3_dataset//train//lr",
-    hr_folder="F://vimeo_mobilenetv3_dataset//train//hr",
-    sequence_length=SEQUENCE_LENGTH,
-    transform=(train_transform_lr, train_transform_hr)  # Pass tuple of transforms
+        lr_folder=train_lr_path,
+        hr_folder=train_hr_path,
+        sequence_length=SEQUENCE_LENGTH,
+        transform=(train_transform_lr, train_transform_hr)
     )
     
     val_dataset = VideoDataset(
-        lr_folder="F://vimeo_mobilenetv3_dataset//val//lr",
-        hr_folder="F://vimeo_mobilenetv3_dataset//val//hr",
+        lr_folder=val_lr_path,
+        hr_folder=val_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr)  # Pass tuple of transforms
+        transform=(valid_transform_lr, valid_transform_hr)
     )
     
     test_dataset = VideoDataset(
-        lr_folder="F://vimeo_mobilenetv3_dataset//test//lr",
-        hr_folder="F://vimeo_mobilenetv3_dataset//test//hr",
+        lr_folder=test_lr_path,
+        hr_folder=test_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr)  # Pass tuple of transforms
+        transform=(valid_transform_lr, valid_transform_hr)
     )
-      
-    train_lr_path = "F://vimeo_mobilenetv3_dataset//train//lr"
-    train_hr_path = "F://vimeo_mobilenetv3_dataset//train//hr"
-    #print(f"Train LR path exists: {os.path.exists(train_lr_path)}")
-    #print(f"Train HR path exists: {os.path.exists(train_hr_path)}")
-    #print(f"Total samples in train dataset: {len(train_dataset)}")
+    
+    print(f"Train dataset size: {len(train_dataset)}")
+    print(f"Validation dataset size: {len(val_dataset)}")
+    print(f"Test dataset size: {len(test_dataset)}")
+    
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
     
+    # Check sample batch shapes
     for lr_frames, hr_frames in train_loader:
-        print(f"LR input shape: {lr_frames.shape}")  # [batch_size, sequence_length, channels, height, width]
+        print(f"LR input shape: {lr_frames.shape}")  # Expected: [batch_size, sequence_length, channels, height, width]
         print(f"HR target shape: {hr_frames.shape}")
         break  # Just print the first batch
+    
     # Training log
     train_losses = []
     val_losses = []

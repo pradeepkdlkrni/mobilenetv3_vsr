@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8f8f8"/>
+  
+  <!-- Timeline base -->
+  <line x1="100" y1="300" x2="700" y2="300" stroke="#666" stroke-width="3"/>
+  
+  <!-- Time markers -->
+  <line x1="100" y1="290" x2="100" y2="310" stroke="#666" stroke-width="2"/>
+  <text x="100" y="330" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">0:00</text>
+  
+  <line x1="400" y1="290" x2="400" y2="310" stroke="#666" stroke-width="2"/>
+  <text x="400" y="330" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">0:15</text>
+  
+  <line x1="700" y1="290" x2="700" y2="310" stroke="#666" stroke-width="2"/>
+  <text x="700" y="330" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">0:30</text>
+  
+  <!-- Frame markers -->
+  <line x1="140" y1="285" x2="140" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="140" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F1</text>
+  
+  <line x1="180" y1="285" x2="180" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="180" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F2</text>
+  
+  <line x1="220" y1="285" x2="220" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="220" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F3</text>
+  
+  <line x1="260" y1="285" x2="260" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="260" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F4</text>
+  
+  <line x1="300" y1="285" x2="300" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="300" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F5</text>
+  
+  <line x1="340" y1="285" x2="340" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="340" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F6</text>
+  
+  <line x1="380" y1="285" x2="380" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="380" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F7</text>
+  
+  <line x1="420" y1="285" x2="420" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="420" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F8</text>
+  
+  <line x1="460" y1="285" x2="460" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="460" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F9</text>
+  
+  <line x1="500" y1="285" x2="500" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="500" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F10</text>
+  
+  <line x1="540" y1="285" x2="540" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="540" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F11</text>
+  
+  <line x1="580" y1="285" x2="580" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="580" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F12</text>
+  
+  <line x1="620" y1="285" x2="620" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="620" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F13</text>
+  
+  <line x1="660" y1="285" x2="660" y2="315" stroke="#3366cc" stroke-width="2"/>
+  <text x="660" y="275" font-family="Arial" font-size="10" text-anchor="middle" fill="#3366cc">F14</text>
+  
+  <!-- Event zones -->
+  <rect x="140" y="200" width="120" height="40" rx="10" fill="#8ec3eb" stroke="#333" stroke-width="1"/>
+  <text x="200" y="225" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Initial Movement</text>
+  <line x1="200" y1="240" x2="200" y2="285" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <rect x="300" y="150" width="160" height="40" rx="10" fill="#c3eb8e" stroke="#333" stroke-width="1"/>
+  <text x="380" y="175" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Primary Activity Observed</text>
+  <line x1="380" y1="190" x2="380" y2="285" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <rect x="500" y="200" width="120" height="40" rx="10" fill="#eb8ec3" stroke="#333" stroke-width="1"/>
+  <text x="560" y="225" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Final Movement</text>
+  <line x1="560" y1="240" x2="560" y2="285" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <!-- Event zones below timeline -->
+  <rect x="200" y="360" width="100" height="80" rx="10" fill="#ffecb3" stroke="#333" stroke-width="1"/>
+  <text x="250" y="385" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Spatial Zone A</text>
+  <text x="250" y="405" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Features: Structure</text>
+  <text x="250" y="425" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Frames: 1-5</text>
+  <line x1="250" y1="360" x2="250" y2="330" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <rect x="380" y="360" width="100" height="80" rx="10" fill="#ffecb3" stroke="#333" stroke-width="1"/>
+  <text x="430" y="385" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Spatial Zone B</text>
+  <text x="430" y="405" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Features: Activity</text>
+  <text x="430" y="425" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Frames: 6-10</text>
+  <line x1="430" y1="360" x2="430" y2="330" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <rect x="560" y="360" width="100" height="80" rx="10" fill="#ffecb3" stroke="#333" stroke-width="1"/>
+  <text x="610" y="385" font-family="Arial" font-size="12" text-anchor="middle" fill="#000">Spatial Zone C</text>
+  <text x="610" y="405" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Features: Exit</text>
+  <text x="610" y="425" font-family="Arial" font-size="11" text-anchor="middle" fill="#000">Frames: 11-15</text>
+  <line x1="610" y1="360" x2="610" y2="330" stroke="#333" stroke-width="1" stroke-dasharray="5,3"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold" fill="#000">Temporal Sequence Diagram</text>
+  <text x="400" y="55" font-family="Arial" font-size="14" text-anchor="middle" fill="#666">Frame Analysis with Spatial and Temporal Associations</text>
+</svg>
