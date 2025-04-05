@@ -24,7 +24,7 @@ valid_transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-class VideoDataset(Dataset):
+class VideoDataset_notused(Dataset):
     def __init__(self, lr_folder, hr_folder, sequence_length=SEQUENCE_LENGTH, transform=None):
         self.lr_folder = lr_folder
         self.hr_folder = hr_folder
@@ -90,25 +90,25 @@ class VideoDataset(Dataset):
 # Define separate transforms for LR and HR
 train_transform_lr = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((32, 32)),  # LR image size
+    #transforms.Resize((32, 32)),  # LR image size
     transforms.ToTensor()
 ])
 
 train_transform_hr = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((64, 64)),  # HR image size (4x larger)
+    #transforms.Resize((64, 64)),  # HR image size (4x larger)
     transforms.ToTensor()
 ])
 
 valid_transform_lr = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((32, 32)),  # LR validation size
+    #transforms.Resize((32, 32)),  # LR validation size
     transforms.ToTensor()
 ])
 
 valid_transform_hr = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((64, 64)),  # HR validation size
+    #transforms.Resize((64, 64)),  # HR validation size
     transforms.ToTensor()
 ])
 

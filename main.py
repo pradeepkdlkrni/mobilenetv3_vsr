@@ -43,8 +43,8 @@ print(f"Using device: {device}")
 # Define hyperparameters
 BATCH_SIZE = 4
 LEARNING_RATE = 1e-4
-NUM_EPOCHS = 10
-SCALE_FACTOR = 8  # Super-resolution scale factor
+NUM_EPOCHS = 5
+SCALE_FACTOR = 32  # Super-resolution scale factor
 SEQUENCE_LENGTH = 5  # Number of consecutive frames to process
 #%%
 import cv2

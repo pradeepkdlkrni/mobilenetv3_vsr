@@ -7,7 +7,7 @@ Created on Sat Mar  1 14:59:49 2025
 
 # File: model.py
 # Contains all model-related classes
-
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -103,6 +103,7 @@ class TemporalConsistencyModule(nn.Module):
 class ReconstructionModule(nn.Module):
     def __init__(self, in_channels, scale_factor):
         super(ReconstructionModule, self).__init__()
+        print(f"ReconstructionModule will perform {int(math.log2(scale_factor))} upscales")
         self.scale_factor = scale_factor
         
         # Initial convolution to process features
@@ -115,6 +116,8 @@ class ReconstructionModule(nn.Module):
         
         # For upscaling from 8×8 to 128×128, we need 4x upscaling
         # We'll do three PixelShuffle operations: 8×8 -> 16×16 -> 32×32 -> 64×64 -> 128×128
+        
+        '''
         self.upscale = nn.Sequential(
             # First upscale: 8×8 -> 16×16
             nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
@@ -134,30 +137,53 @@ class ReconstructionModule(nn.Module):
             # Fourth upscale: 64×64 -> 128×128
             nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
             nn.PixelShuffle(2),
+            nn.ReLU(inplace=True),
+            
+            #this is to fix after removing resizing in train, test, val
+            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+            nn.PixelShuffle(2),
             nn.ReLU(inplace=True)
         )
+        '''
+        #above chane is done to include the scale factor dynamically.
+        # Calculate the number of upscaling steps required
+        num_upscales = int(math.log2(scale_factor))
+        print(f"ReconstructionModule will perform {num_upscales} upscales to achieve {scale_factor}x scaling")
+        
+        # Create upscaling layers based on the scale factor
+        layers = []
+        for _ in range(num_upscales):
+            layers.extend([
+                nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+                nn.PixelShuffle(2),
+                nn.ReLU(inplace=True)
+            ])
+        self.upscale = nn.Sequential(*layers)
         
         # Final convolution to generate RGB output
         self.final_conv = nn.Conv2d(FEATURE_CHANNELS, 3, kernel_size=3, padding=1)
     
     def forward(self, x):
-       # print(f"Reconstruction input shape: {x.shape}")
+        # Add detailed shape information for debugging
+        print(f"Reconstruction input shape: {x.shape}")
         
         # Initial feature processing
         x = self.conv1(x)
-        #print(f"After initial conv: {x.shape}")
+        print(f"After initial conv: {x.shape}")
         
         # Residual feature enhancement
         x = self.res_blocks(x)
-        #print(f"After residual blocks: {x.shape}")
+        print(f"After residual blocks: {x.shape}")
         
-        # Upscaling
-        x = self.upscale(x)
-        #print(f"After upscaling: {x.shape}")
+        # Upscaling - add shape tracking per layer
+        for i, layer in enumerate(self.upscale):
+            x = layer(x)
+            if isinstance(layer, nn.PixelShuffle):
+                print(f"After upscale layer {i//3}: {x.shape}")
         
         # Final output generation
         x = self.final_conv(x)
-        #print(f"Final output shape: {x.shape}")
+        print(f"Final output shape: {x.shape}")
         
         return x
 
@@ -192,6 +218,7 @@ class VideoSuperResolution(nn.Module):
         
         # Reconstruction module
        # print("Initializing Reconstruction Module...")
+        print("scale factor passed to ReconstructionModule = ", scale_factor)
         self.reconstruction = ReconstructionModule(feature_channels, scale_factor)
        # print("Reconstruction Module initialized.")
         
