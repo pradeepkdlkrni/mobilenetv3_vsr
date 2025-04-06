@@ -1,78 +1,127 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar  1 15:00:09 2025
-
-@author: prade
-"""
 import torch
-import torch.nn as nn  
-import torchvision.models as models
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
+from torchvision.models import vgg16, VGG16_Weights
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-class TemporalConsistencyLoss(nn.Module):
-    def __init__(self, alpha=0.8):
-        super(TemporalConsistencyLoss, self).__init__()
-        self.alpha = alpha
-        self.mse = nn.MSELoss()
-    
-    def forward(self, output_frames, target_frames, prev_output_frames=None):
-        # Standard reconstruction loss
-        recon_loss = self.mse(output_frames, target_frames)
+class ReconstructionLoss(nn.Module):
+    def __init__(self):
+        super(ReconstructionLoss, self).__init__()
+        self.mse_loss = nn.MSELoss()
         
-        # If no previous output is available, return only reconstruction loss
-        if prev_output_frames is None:
-            return recon_loss
+    def forward(self, output, target):
+        """
+        Calculate reconstruction loss
         
-        # Compute temporal difference in outputs
-        current_temp_diff = output_frames[:, 1:] - output_frames[:, :-1]
-        
-        # Compute temporal difference in targets
-        target_temp_diff = target_frames[:, 1:] - target_frames[:, :-1]
-        
-        # Temporal consistency loss
-        temp_loss = self.mse(current_temp_diff, target_temp_diff)
-        
-        # Combined loss
-        return recon_loss + self.alpha * temp_loss
+        Args:
+            output (torch.Tensor): Shape [batch_size, sequence_length, channels, height, width]
+            target (torch.Tensor): Shape [batch_size, sequence_length, channels, height, width]
+        """
+        # Ensure shapes match before computing loss
+        if output.shape != target.shape:
+            # Resize output to match target if necessary
+            b, t, c, h, w = output.shape
+            target_b, target_t, target_c, target_h, target_w = target.shape
+            
+            if h != target_h or w != target_w:
+                output_reshaped = output.view(-1, c, h, w)
+                output_resized = F.interpolate(output_reshaped, size=(target_h, target_w), mode='bilinear', align_corners=False)
+                output = output_resized.view(b, t, c, target_h, target_w)
+                
+        return self.mse_loss(output, target)
 
-# Perceptual loss using VGG features
 class PerceptualLoss(nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()
-        vgg = models.vgg19(pretrained=True).features.to(device)
-        self.vgg_layers = nn.Sequential(*list(vgg.children())[:16])
+        vgg = vgg16(weights=VGG16_Weights.DEFAULT)
+        self.feature_extractor = nn.Sequential(*list(vgg.features.children())[:16])
         
-        # Freeze VGG parameters
-        for param in self.vgg_layers.parameters():
+        # Freeze the VGG parameters
+        for param in self.feature_extractor.parameters():
             param.requires_grad = False
-        
-        self.mse = nn.MSELoss()
-    
+            
     def forward(self, output, target):
-        output_features = self.vgg_layers(output.view(-1, 3, output.shape[-2], output.shape[-1]))
-        target_features = self.vgg_layers(target.view(-1, 3, target.shape[-2], target.shape[-1]))
+        """
+        Calculate perceptual loss using VGG16 features
         
-        return self.mse(output_features, target_features)
+        Args:
+            output (torch.Tensor): Shape [batch_size*sequence_length, channels, height, width]
+            target (torch.Tensor): Shape [batch_size*sequence_length, channels, height, width]
+        """
+        # Ensure output and target have the same spatial dimensions for VGG
+        if output.shape[2:] != target.shape[2:]:
+            output = F.interpolate(output, size=target.shape[2:], mode='bilinear', align_corners=False)
+            
+        output_features = self.feature_extractor(output)
+        target_features = self.feature_extractor(target)
+        
+        return F.mse_loss(output_features, target_features)
 
-# Combined loss function
-class CombinedLoss(nn.Module):
-    def __init__(self, lambda_rec=1.0, lambda_perc=0.1, lambda_temp=0.8):
-        #super(CombinedLoss, self).__init__()
-        super().__init__()
-        self.lambda_rec = lambda_rec
-        self.lambda_perc = lambda_perc
-        self.lambda_temp = lambda_temp
+class TemporalConsistencyLoss(nn.Module):
+    def __init__(self):
+        super(TemporalConsistencyLoss, self).__init__()
         
-        self.rec_loss = nn.MSELoss()
+    def forward(self, output, target, prev_output=None):
+        """
+        Calculate temporal consistency loss
+        
+        Args:
+            output (torch.Tensor): Shape [batch_size, sequence_length, channels, height, width]
+            target (torch.Tensor): Shape [batch_size, sequence_length, channels, height, width]
+            prev_output (torch.Tensor, optional): Previous output for temporal consistency
+        """
+        if prev_output is None or output.shape[1] <= 1:
+            return torch.tensor(0.0, device=output.device)
+            
+        # Compute temporal differences
+        curr_frames = output[:, 1:]  # Exclude first frame
+        prev_frames = output[:, :-1]  # Exclude last frame
+        
+        # Ensure shapes match before computing loss
+        if curr_frames.shape[3:] != prev_frames.shape[3:]:
+            b, t, c, h, w = curr_frames.shape
+            prev_h, prev_w = prev_frames.shape[3:]
+            
+            if h != prev_h or w != prev_w:
+                curr_frames_reshaped = curr_frames.contiguous().view(-1, c, h, w)
+                curr_frames_resized = F.interpolate(curr_frames_reshaped, size=(prev_h, prev_w), mode='bilinear', align_corners=False)
+                curr_frames = curr_frames_resized.view(b, t, c, prev_h, prev_w)
+        
+        # Temporal smoothness loss
+        temporal_diff = F.mse_loss(curr_frames, prev_frames)
+        
+        return temporal_diff
+
+class CombinedLoss(nn.Module):
+    def __init__(self, rec_weight=1.0, perc_weight=0.1, temp_weight=0.05):
+        super(CombinedLoss, self).__init__()
+        self.rec_loss = ReconstructionLoss()
         self.perc_loss = PerceptualLoss()
         self.temp_loss = TemporalConsistencyLoss()
-    
+        
+        self.rec_weight = rec_weight
+        self.perc_weight = perc_weight
+        self.temp_weight = temp_weight
+        
     def forward(self, output, target, prev_output=None):
         # Reshape if needed for perceptual loss
         b, t, c, h, w = output.shape
         
+        # Ensure dimensions match between output and target
+        if output.shape[3:] != target.shape[3:]:
+            output_reshaped = output.view(-1, c, h, w)
+            output_resized = F.interpolate(output_reshaped, size=target.shape[3:], mode='bilinear', align_corners=False)
+            output = output_resized.view(b, t, c, target.shape[3], target.shape[4])
+            
         rec = self.rec_loss(output, target)
-        perc = self.perc_loss(output.view(-1, c, h, w), target.view(-1, c, h, w))
+        
+        # Reshape for perceptual loss
+        output_perc = output.view(-1, c, output.shape[3], output.shape[4])
+        target_perc = target.view(-1, c, target.shape[3], target.shape[4])
+        
+        perc = self.perc_loss(output_perc, target_perc)
         temp = self.temp_loss(output, target, prev_output)
         
-        return self.lambda_rec * rec + self.lambda_perc * perc + self.lambda_temp * temp
+        total_loss = self.rec_weight * rec + self.perc_weight * perc + self.temp_weight * temp
+        
+        return total_loss

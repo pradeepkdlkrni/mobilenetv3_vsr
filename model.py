@@ -1,261 +1,143 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar  1 14:59:49 2025
+# Fixed model.py
 
-@author: prade
-"""
-
-# File: model.py
-# Contains all model-related classes
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 from torchvision import models
-from torch.nn.utils import weight_norm
-
-# Define constants
+from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 FEATURE_CHANNELS = 64
 
-# MobileNetV3 Feature Extractor
 class MobileNetV3FeatureExtractor(nn.Module):
     def __init__(self, pretrained=True):
         super(MobileNetV3FeatureExtractor, self).__init__()
-        # Load MobileNetV3 Small model pretrained on ImageNet
-        mobilenet = models.mobilenet_v3_small(pretrained=pretrained)
-        
-        # Use only the features part (before classifier)
-        self.features = nn.Sequential(*list(mobilenet.features.children())[:3])
-        
-        # Freeze the parameters
+
+        if pretrained:
+            weights = MobileNet_V3_Small_Weights.DEFAULT
+        else:
+            weights = None
+
+        mobilenet = mobilenet_v3_small(weights=weights)
+        self.features = nn.Sequential(*list(mobilenet.features.children())[:6])
+
         if pretrained:
             for param in self.features.parameters():
                 param.requires_grad = False
-    
-    def forward(self, x):
-        return self.features(x)
 
-# Residual Block for the reconstruction network
+    def forward(self, x, scale=4):
+        x = self.features(x)
+        B, C, H, W = x.shape
+        x = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
+        return x
+
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
         super(ResidualBlock, self).__init__()
-        self.conv1 = weight_norm(nn.Conv2d(channels, channels, kernel_size=3, padding=1))
-        self.conv2 = weight_norm(nn.Conv2d(channels, channels, kernel_size=3, padding=1))
-        self.relu = nn.ReLU(inplace=True)
-    
-    def forward(self, x):
-        residual = x
-        out = self.relu(self.conv1(x))
-        out = self.conv2(out)
-        out += residual
-        return out
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        )
 
-# Temporal Consistency Module
+    def forward(self, x):
+        return x + self.block(x)
+
 class TemporalConsistencyModule(nn.Module):
     def __init__(self, in_channels, hidden_dim=64):
         super(TemporalConsistencyModule, self).__init__()
         self.conv_h = nn.Conv2d(in_channels, hidden_dim, kernel_size=3, padding=1)
         self.conv_x = nn.Conv2d(in_channels, hidden_dim, kernel_size=3, padding=1)
         self.conv_o = nn.Conv2d(hidden_dim, in_channels, kernel_size=3, padding=1)
-        
-        # Optical flow estimation layers
+
         self.flow_conv1 = nn.Conv2d(in_channels * 2, 24, kernel_size=3, padding=1)
         self.flow_conv2 = nn.Conv2d(24, 24, kernel_size=3, padding=1)
         self.flow_conv3 = nn.Conv2d(24, 2, kernel_size=3, padding=1)
-        
+
         self.relu = nn.ReLU(inplace=True)
-    
+
     def forward(self, current, previous=None):
         if previous is None:
             return current
-        
-        # Estimate optical flow between frames
+
         flow_input = torch.cat([current, previous], dim=1)
         flow = self.relu(self.flow_conv1(flow_input))
         flow = self.relu(self.flow_conv2(flow))
         flow = self.flow_conv3(flow)
-        
-        # Warp previous features
+
         b, c, h, w = previous.size()
-        grid_y, grid_x = torch.meshgrid(torch.arange(0, h), torch.arange(0, w))
+        grid_y, grid_x = torch.meshgrid(torch.arange(0, h), torch.arange(0, w), indexing='ij')
         grid = torch.stack((grid_x, grid_y), dim=2).float().to(current.device)
         grid = grid.unsqueeze(0).repeat(b, 1, 1, 1)
         flow_grid = grid + flow.permute(0, 2, 3, 1)
-        
-        # Normalize coordinates to [-1, 1]
+
         flow_grid[:, :, :, 0] = 2.0 * flow_grid[:, :, :, 0] / (w - 1) - 1.0
         flow_grid[:, :, :, 1] = 2.0 * flow_grid[:, :, :, 1] / (h - 1) - 1.0
-        
-        # Warp features using the flow field
+
         warped_previous = F.grid_sample(previous, flow_grid, mode='bilinear', padding_mode='border', align_corners=True)
-        
-        # Temporal fusion
+
         h_state = self.conv_h(warped_previous)
         x_state = self.conv_x(current)
         combined = self.relu(h_state + x_state)
         out = self.conv_o(combined)
-        
+
         return out
 
-# Reconstruction module
-# Reconstruction module
 class ReconstructionModule(nn.Module):
-    def __init__(self, in_channels, scale_factor):
+    def __init__(self, in_channels, scale_factor=4):
         super(ReconstructionModule, self).__init__()
-        print(f"ReconstructionModule will perform {int(math.log2(scale_factor))} upscales")
         self.scale_factor = scale_factor
-        
-        # Initial convolution to process features
-        self.conv1 = nn.Conv2d(in_channels, FEATURE_CHANNELS, kernel_size=3, padding=1)
-        
-        # Residual blocks for feature processing
-        self.res_blocks = nn.Sequential(
-            *[ResidualBlock(FEATURE_CHANNELS) for _ in range(5)]
-        )
-        
-        # For upscaling from 8×8 to 128×128, we need 4x upscaling
-        # We'll do three PixelShuffle operations: 8×8 -> 16×16 -> 32×32 -> 64×64 -> 128×128
-        
-        '''
-        self.upscale = nn.Sequential(
-            # First upscale: 8×8 -> 16×16
-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
-            nn.PixelShuffle(2),
-            nn.ReLU(inplace=True),
-            
-            # Second upscale: 16×16 -> 32×32
-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
-            nn.PixelShuffle(2),
-            nn.ReLU(inplace=True),
-            
-            # Third upscale: 32×32 -> 64×64
-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
-            nn.PixelShuffle(2),
-            nn.ReLU(inplace=True),
-            
-            # Fourth upscale: 64×64 -> 128×128
-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
-            nn.PixelShuffle(2),
-            nn.ReLU(inplace=True),
-            
-            #this is to fix after removing resizing in train, test, val
-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
-            nn.PixelShuffle(2),
-            nn.ReLU(inplace=True)
-        )
-        '''
-        #above chane is done to include the scale factor dynamically.
-        # Calculate the number of upscaling steps required
         num_upscales = int(math.log2(scale_factor))
-        print(f"ReconstructionModule will perform {num_upscales} upscales to achieve {scale_factor}x scaling")
-        
-        # Create upscaling layers based on the scale factor
-        layers = []
+        assert 2 ** num_upscales == scale_factor, "scale_factor must be a power of 2"
+
+        self.conv1 = nn.Conv2d(in_channels, FEATURE_CHANNELS, kernel_size=3, padding=1)
+        self.res_blocks = nn.Sequential(*[ResidualBlock(FEATURE_CHANNELS) for _ in range(5)])
+
+        up_layers = []
         for _ in range(num_upscales):
-            layers.extend([
+            up_layers += [
                 nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
                 nn.PixelShuffle(2),
                 nn.ReLU(inplace=True)
-            ])
-        self.upscale = nn.Sequential(*layers)
-        
-        # Final convolution to generate RGB output
+            ]
+        self.upscale = nn.Sequential(*up_layers)
         self.final_conv = nn.Conv2d(FEATURE_CHANNELS, 3, kernel_size=3, padding=1)
-    
+
     def forward(self, x):
-        # Add detailed shape information for debugging
-        print(f"Reconstruction input shape: {x.shape}")
-        
-        # Initial feature processing
         x = self.conv1(x)
-        print(f"After initial conv: {x.shape}")
-        
-        # Residual feature enhancement
         x = self.res_blocks(x)
-        print(f"After residual blocks: {x.shape}")
-        
-        # Upscaling - add shape tracking per layer
-        for i, layer in enumerate(self.upscale):
-            x = layer(x)
-            if isinstance(layer, nn.PixelShuffle):
-                print(f"After upscale layer {i//3}: {x.shape}")
-        
-        # Final output generation
+        x = self.upscale(x)
         x = self.final_conv(x)
-        print(f"Final output shape: {x.shape}")
-        
         return x
 
-
-
-
-# Complete Video Super Resolution Model
 class VideoSuperResolution(nn.Module):
     def __init__(self, scale_factor=4):
         super(VideoSuperResolution, self).__init__()
-        #print("Initializing MobileNetV3 Feature Extractor...")
-        # Feature extractor
         self.feature_extractor = MobileNetV3FeatureExtractor(pretrained=True)
-        #print("Feature Extractor initialized.")
-        #print("Running a dummy forward pass through feature extractor...")
-        # Determine the feature size
         with torch.no_grad():
             sample_input = torch.randn(1, 3, 64, 64)
             features = self.feature_extractor(sample_input)
             feature_channels = features.shape[1]
-        #print(f"Feature extractor output shape: {features.shape}")
-        
-        # Temporal consistency module
-        #print("Initializing Temporal Consistency Module...")
+
         self.temporal_module = TemporalConsistencyModule(feature_channels)
-        #print("Temporal Consistency Module initialized.")
-        
-        # Feature fusion (additional convolutional layer to combine features)
-        #print("Initializing Feature Fusion Layer...")
         self.fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
-        #print("Feature Fusion Layer initialized.")
-        
-        # Reconstruction module
-       # print("Initializing Reconstruction Module...")
-        print("scale factor passed to ReconstructionModule = ", scale_factor)
         self.reconstruction = ReconstructionModule(feature_channels, scale_factor)
-       # print("Reconstruction Module initialized.")
-        
-        # Store previous features for temporal consistency
         self.prev_features = None
-       # print("Model initialization complete.")
-    
-    def forward(self, x, reset_state=False):
-        
+
+    def forward(self, x, scale_factor=4, reset_state=True):
         batch_size, seq_len, c, h, w = x.shape
-        print(f"Input shape before processing: {x.shape}")
         outputs = []
-        
+
         if reset_state:
             self.prev_features = None
-        
-        # Process each frame in the sequence
+
         for t in range(seq_len):
-            # Extract current frame
             current_frame = x[:, t, :, :, :]
-            #print(f"Current frame shape: {current_frame.shape}")
-            # Extract features using MobileNetV3
             current_features = self.feature_extractor(current_frame)
-            #print(f"Features shape after extraction: {current_features.shape}")
-            # Apply temporal consistency if we have previous features
             temporally_consistent_features = self.temporal_module(current_features, self.prev_features)
-            ##print(f"Features shape after temporal module: {temporally_consistent_features.shape}")
-            # Update previous features for next iteration
             self.prev_features = current_features.detach()
-            
-            # Fuse features
+
             fused_features = self.fusion(temporally_consistent_features)
-            #print(f"Features shape after fusion: {fused_features.shape}")
-            # Reconstruct high-resolution frame
             sr_frame = self.reconstruction(fused_features)
-            print(f"SR frame shape after reconstruction: {sr_frame.shape}")
             outputs.append(sr_frame)
-        
-        # Stack outputs along sequence dimension
+
         return torch.stack(outputs, dim=1)

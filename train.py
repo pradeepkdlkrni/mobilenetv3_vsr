@@ -14,7 +14,7 @@ from tqdm import tqdm
 import torch
 NUM_EPOCHS = 10
 
-def train(model, train_loader, criterion, optimizer, epoch, device):
+def train(model, train_loader, criterion, optimizer, epoch, device, scale_factor):
     model.train()
     running_loss = 0.0
     prev_output = None
@@ -29,9 +29,11 @@ def train(model, train_loader, criterion, optimizer, epoch, device):
             optimizer.zero_grad()
             
             # Reset state at the beginning of a batch
-            output = model(lr_frames, reset_state=True)
+            #output = model(lr_frames, reset_state=True)
+            output = model(lr_frames, scale_factor=scale_factor, reset_state=True)
             #print(f"Output shape: {output.shape}, Target shape: {hr_frames.shape}")
             # Compute loss with temporal consistency
+            print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
             loss = criterion(output, hr_frames, prev_output)
             
             # Backpropagation and optimization
@@ -48,7 +50,7 @@ def train(model, train_loader, criterion, optimizer, epoch, device):
     return running_loss / len(train_loader)
 
 # Validation function
-def validate(model, val_loader, criterion, device):
+def validate(model, val_loader, criterion, device, scale_factor):
     model.eval()
     val_loss = 0.0
     psnr_total = 0.0
@@ -60,8 +62,20 @@ def validate(model, val_loader, criterion, device):
             hr_frames = hr_frames.to(device)
             
             # Reset state at the beginning of a batch
-            output = model(lr_frames, reset_state=True)
+            #output = model(lr_frames, reset_state=True)
+            output = model(lr_frames, scale_factor=scale_factor, reset_state=True)
             
+            target_size = hr_frames.shape[-2:]  # (H, W)
+            B, T, C, H, W = output.shape
+            output = output.view(B * T, C, H, W)
+
+            # Target size from hr_frames
+            target_H, target_W = hr_frames.shape[-2:]
+            output = F.interpolate(output, size=(target_H, target_W), mode='bilinear', align_corners=False)
+            
+            # Reshape back to [B, T, C, H, W]
+            output = output.view(B, T, C, target_H, target_W) 
+            print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
             # Compute loss
             loss = criterion(output, hr_frames, prev_output)
             val_loss += loss.item()
@@ -101,8 +115,13 @@ def calculate_ssim(img1, img2):
     ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
     return ssim_map.mean()
 
+
+def resize_to_match(input_tensor, target_tensor):
+    return F.interpolate(input_tensor.unsqueeze(0), size=target_tensor.shape[-2:], mode='bilinear', align_corners=False).squeeze(0)
+
+
 # Test function
-def test(model, test_loader, device, save_path='results'):
+def test(model, test_loader, device, scale_factor, save_path='results'):
     model.eval()
     os.makedirs(save_path, exist_ok=True)
     
@@ -115,8 +134,8 @@ def test(model, test_loader, device, save_path='results'):
             hr_frames = hr_frames.to(device)
             
             # Reset state at the beginning of a batch
-            output = model(lr_frames, reset_state=True)
-            
+            #output = model(lr_frames, reset_state=True)
+            output = model(lr_frames, scale_factor=scale_factor, reset_state=True)
             # Save some results for visualization
             if batch_idx < 5:  # Save first 5 batches
                 for seq_idx in range(min(2, output.size(0))):  # Save first 2 sequences in each batch
@@ -152,22 +171,26 @@ def test(model, test_loader, device, save_path='results'):
                 for frame_idx in range(output.size(1)):
                     sr = output[seq_idx, frame_idx].cpu()
                     hr = hr_frames[seq_idx, frame_idx].cpu()
-                    
+            
+                    # Ensure output resolution matches HR
+                    if sr.shape != hr.shape:
+                        sr = resize_to_match(sr, hr)
+            
                     # Calculate PSNR
                     mse = F.mse_loss(sr, hr).item()
                     psnr = 10 * np.log10(1.0 / mse if mse > 0 else 1e-8)
                     psnr_values.append(psnr)
-                    
+            
                     # Calculate SSIM
                     sr_np = sr.permute(1, 2, 0).numpy() * 255
                     hr_np = hr.permute(1, 2, 0).numpy() * 255
                     sr_np = np.clip(sr_np, 0, 255).astype(np.uint8)
                     hr_np = np.clip(hr_np, 0, 255).astype(np.uint8)
-                    
+            
                     # Convert to grayscale for SSIM
                     sr_gray = cv2.cvtColor(sr_np, cv2.COLOR_RGB2GRAY)
                     hr_gray = cv2.cvtColor(hr_np, cv2.COLOR_RGB2GRAY)
-                    
+            
                     # Calculate SSIM
                     ssim = calculate_ssim(sr_gray, hr_gray)
                     ssim_values.append(ssim)

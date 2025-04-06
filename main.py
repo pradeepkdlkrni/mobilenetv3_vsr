@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import sys
+import argparse
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 from os import chdir, getcwd
@@ -43,13 +44,32 @@ print(f"Using device: {device}")
 # Define hyperparameters
 BATCH_SIZE = 4
 LEARNING_RATE = 1e-4
-NUM_EPOCHS = 5
-SCALE_FACTOR = 32  # Super-resolution scale factor
+NUM_EPOCHS = 10
 
-#32 means 4 x upscaling.
+# Scale factor is now configurable via command-line argument
+parser = argparse.ArgumentParser(description='Video Super Resolution with Dynamic Scaling')
+parser.add_argument('--scale', type=int, default=4, choices=[2, 4, 8, 16, 32, 64],
+                   help='Super-resolution scale factor (2, 4, 8, 16, 32, or 64)')
+parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
+parser.add_argument('--batch_size', type=int, default=4, help='Batch size for training')
+parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+parser.add_argument('--sequence_length', type=int, default=5, help='Number of consecutive frames to process')
 
+args = parser.parse_args()
 
-SEQUENCE_LENGTH = 5  # Number of consecutive frames to process
+# Update hyperparameters from command line
+SCALE_FACTOR = args.scale
+NUM_EPOCHS = args.epochs
+BATCH_SIZE = args.batch_size
+LEARNING_RATE = args.lr
+SEQUENCE_LENGTH = args.sequence_length
+
+print(f"Training with scale factor: {SCALE_FACTOR}x")
+print(f"Sequence length: {SEQUENCE_LENGTH}")
+print(f"Number of epochs: {NUM_EPOCHS}")
+print(f"Batch size: {BATCH_SIZE}")
+print(f"Learning rate: {LEARNING_RATE}")
+
 #%%
 import cv2
 import matplotlib.pyplot as plt
@@ -73,33 +93,34 @@ def visualize_sr_results(model, test_loader, device, num_videos=3):
                 hr_image = hr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
 
                 # Normalize images to 0-255
-                lr_image = (lr_image * 255.0).astype(np.uint8)
-                sr_image = (sr_image * 255.0).astype(np.uint8)
-                hr_image = (hr_image * 255.0).astype(np.uint8)
+                lr_image = np.clip(lr_image * 255.0, 0, 255).astype(np.uint8)
+                sr_image = np.clip(sr_image * 255.0, 0, 255).astype(np.uint8)
+                hr_image = np.clip(hr_image * 255.0, 0, 255).astype(np.uint8)
 
                 # Save images
                 cv2.imwrite(f"results/lr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(lr_image, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(f"results/sr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(f"results/sr_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png", cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(f"results/hr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(hr_image, cv2.COLOR_RGB2BGR))
 
                 # Display first few frames
                 if vid_idx < num_videos and frame_idx < 3:
-                    plt.figure(figsize=(10, 4))
+                    plt.figure(figsize=(15, 5))
                     plt.subplot(1, 3, 1)
                     plt.imshow(lr_image)
-                    plt.title("Low-Res")
+                    plt.title(f"Low-Res ({lr_image.shape[1]}x{lr_image.shape[0]})")
                     plt.axis("off")
 
                     plt.subplot(1, 3, 2)
                     plt.imshow(sr_image)
-                    plt.title("Super-Res")
+                    plt.title(f"Super-Res {SCALE_FACTOR}x ({sr_image.shape[1]}x{sr_image.shape[0]})")
                     plt.axis("off")
 
                     plt.subplot(1, 3, 3)
                     plt.imshow(hr_image)
-                    plt.title("High-Res (GT)")
+                    plt.title(f"High-Res GT ({hr_image.shape[1]}x{hr_image.shape[0]})")
                     plt.axis("off")
 
+                    plt.savefig(f"results/comparison_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png")
                     plt.show()
             
             if vid_idx == num_videos - 1:  # Stop after visualizing a few videos
@@ -109,9 +130,9 @@ def visualize_sr_results(model, test_loader, device, num_videos=3):
 #%% Cell 7
 def main():
     # Create model
-    #print("invoking model---- ")
+    print(f"Creating VSR model with {SCALE_FACTOR}x upscaling...")
     model = VideoSuperResolution(scale_factor=SCALE_FACTOR).to(device)
-    #print("model ==", model)
+    
     # Define loss function
     criterion = CombinedLoss().to(device)
 
@@ -138,21 +159,24 @@ def main():
         lr_folder=train_lr_path,
         hr_folder=train_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(train_transform_lr, train_transform_hr,SCALE_FACTOR)
+        transform=(train_transform_lr, train_transform_hr),
+        scale_factor=SCALE_FACTOR
     )
     
     val_dataset = VideoDataset(
         lr_folder=val_lr_path,
         hr_folder=val_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr,SCALE_FACTOR)
+        transform=(valid_transform_lr, valid_transform_hr),
+        scale_factor=SCALE_FACTOR
     )
     
     test_dataset = VideoDataset(
         lr_folder=test_lr_path,
         hr_folder=test_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr,SCALE_FACTOR)
+        transform=(valid_transform_lr, valid_transform_hr),
+        scale_factor=SCALE_FACTOR
     )
     
     print(f"Train dataset size: {len(train_dataset)}")
@@ -165,8 +189,10 @@ def main():
     
     # Check sample batch shapes
     for lr_frames, hr_frames in train_loader:
-        print(f"LR input shape: {lr_frames.shape}")  # Expected: [batch_size, sequence_length, channels, height, width]
+        print(f"LR input shape: {lr_frames.shape}")  # [batch_size, sequence_length, channels, height, width]
         print(f"HR target shape: {hr_frames.shape}")
+        print(f"Scale factor verification: HR height / LR height = {hr_frames.shape[3] / lr_frames.shape[3]}")
+        print(f"Scale factor verification: HR width / LR width = {hr_frames.shape[4] / lr_frames.shape[4]}")
         break  # Just print the first batch
     
     # Training log
@@ -175,19 +201,20 @@ def main():
     val_psnrs = []
     best_psnr = 0.0
 
-    # Create directory for checkpoints
-    os.makedirs('checkpoints', exist_ok=True)
+    # Create directory for checkpoints with scale factor in name
+    checkpoint_dir = f'checkpoints_scale{SCALE_FACTOR}x'
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Training loop
     #print("NUM_EPOCHS = ", NUM_EPOCHS )
     #print("model ==", model)
     for epoch in range(NUM_EPOCHS):
         # Train
-        train_loss = train(model, train_loader, criterion, optimizer, epoch, device)
+        train_loss = train(model, train_loader, criterion, optimizer, epoch, device, SCALE_FACTOR)
         train_losses.append(train_loss)
         
         # Validate
-        val_loss, val_psnr = validate(model, val_loader, criterion, device)
+        val_loss, val_psnr = validate(model, val_loader, criterion, device, SCALE_FACTOR)
         val_losses.append(val_loss)
         val_psnrs.append(val_psnr)
         
@@ -206,7 +233,8 @@ def main():
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
                 'best_psnr': best_psnr,
-            }, 'checkpoints/best_model.pth')
+                'scale_factor': SCALE_FACTOR,
+            }, f'{checkpoint_dir}/best_model.pth')
             print(f'New best model saved with PSNR: {best_psnr:.2f}dB')
         
         # Save model periodically
@@ -216,7 +244,8 @@ def main():
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
-            }, f'checkpoints/model_epoch_{epoch+1}.pth')
+                'scale_factor': SCALE_FACTOR,
+            }, f'{checkpoint_dir}/model_epoch_{epoch+1}.pth')
     
 
     # Plot training and validation losses
@@ -227,33 +256,33 @@ def main():
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.title('Training and Validation Loss')
+    plt.title(f'Training and Validation Loss ({SCALE_FACTOR}x)')
     
     plt.subplot(1, 2, 2)
     plt.plot(val_psnrs, label='Val PSNR')
     plt.xlabel('Epoch')
     plt.ylabel('PSNR (dB)')
     plt.legend()
-    plt.title('Validation PSNR')
+    plt.title(f'Validation PSNR ({SCALE_FACTOR}x)')
     
     plt.tight_layout()
-    plt.savefig('training_curves.png')
+    plt.savefig(f'training_curves_scale{SCALE_FACTOR}x.png')
     plt.show()
     
     # Test the best model
     print("Loading best model for testing...")
-    checkpoint = torch.load('checkpoints/best_model.pth')
+    checkpoint = torch.load(f'{checkpoint_dir}/best_model.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     
+    # Create results directory with scale factor
+    results_dir = f'results_scale{SCALE_FACTOR}x'
+    os.makedirs(results_dir, exist_ok=True)
+    
     # Run test
-    avg_psnr, avg_ssim = test(model, test_loader, device, save_path='results')
-    print(f"Test Results - Average PSNR: {avg_psnr:.2f}dB, Average SSIM: {avg_ssim:.4f}")
+    avg_psnr, avg_ssim = test(model, test_loader, device,SCALE_FACTOR, save_path=results_dir)
+    print(f"Test Results ({SCALE_FACTOR}x) - Average PSNR: {avg_psnr:.2f}dB, Average SSIM: {avg_ssim:.4f}")
 
- # Run test
-   # avg_psnr, avg_ssim = test(model, test_loader, device, save_path='results')
-   # print(f"Test Results - Average PSNR: {avg_psnr:.2f}dB, Average SSIM: {avg_ssim:.4f}")
-
-    # 🔹 Call visualization after testing
+    # Call visualization after testing
     visualize_sr_results(model, test_loader, device)
 
 
