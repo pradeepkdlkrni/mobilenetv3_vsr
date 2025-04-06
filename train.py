@@ -12,13 +12,81 @@ import cv2
 from tqdm import tqdm
 
 import torch
+import time
 NUM_EPOCHS = 10
+
+def measure_inference_time(model, test_loader, device, scale_factor, num_frames=100):
+    """
+    Measure inference time of the model on test data
+    """
+    model.eval()
+    total_time = 0.0
+    frame_count = 0
+    batch_count = 0
+    
+    import time
+    
+    # Warmup phase (to ensure GPU is ready)
+    print("Warming up...")
+    with torch.no_grad():
+        for lr_frames, _ in test_loader:
+            if batch_count >= 3:  # 3 batches for warmup
+                break
+            lr_frames = lr_frames.to(device)
+            _ = model(lr_frames, scale_factor=scale_factor, reset_state=True)
+            batch_count += 1
+    
+    # Actual timing
+    print("Measuring inference time...")
+    batch_count = 0
+    with torch.no_grad():
+        for lr_frames, _ in test_loader:
+            lr_frames = lr_frames.to(device)
+            
+            batch_size, seq_len = lr_frames.shape[0], lr_frames.shape[1]
+            frame_count += batch_size * seq_len
+            
+            # Time the forward pass
+            torch.cuda.synchronize() if torch.cuda.is_available() else None
+            start = time.time()
+            _ = model(lr_frames, scale_factor=scale_factor, reset_state=True)
+            torch.cuda.synchronize() if torch.cuda.is_available() else None
+            end = time.time()
+            
+            inference_time = end - start
+            total_time += inference_time
+            
+            print(f"Batch {batch_count+1}: {batch_size} sequences × {seq_len} frames = {batch_size*seq_len} frames in {inference_time:.4f}s ({batch_size*seq_len/inference_time:.2f} FPS)")
+            
+            batch_count += 1
+            
+            # Stop after processing enough frames
+            if frame_count >= num_frames:
+                break
+    
+    avg_time_per_frame = total_time / frame_count
+    fps = 1.0 / avg_time_per_frame
+    
+    print("\nInference Performance Summary:")
+    print(f"Total frames processed: {frame_count}")
+    print(f"Total inference time: {total_time:.4f} seconds")
+    print(f"Average time per frame: {avg_time_per_frame*1000:.2f} ms")
+    print(f"Frames per second (FPS): {fps:.2f}")
+    
+    # Additional per-resolution metrics
+    sample_lr = lr_frames[0, 0].shape
+    h, w = sample_lr[-2], sample_lr[-1]
+    print(f"Input resolution: {w}×{h}")
+    print(f"Processing speed: {fps * h * w / (1000000):.2f} Megapixels/second")
+    
+    return total_time, avg_time_per_frame, fps
 
 def train(model, train_loader, criterion, optimizer, epoch, device, scale_factor):
     model.train()
     running_loss = 0.0
     prev_output = None
     
+    start_time = time.time()
     with tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}") as pbar:
         for i, (lr_frames, hr_frames) in enumerate(pbar):
             # Move data to device
@@ -33,7 +101,7 @@ def train(model, train_loader, criterion, optimizer, epoch, device, scale_factor
             output = model(lr_frames, scale_factor=scale_factor, reset_state=True)
             #print(f"Output shape: {output.shape}, Target shape: {hr_frames.shape}")
             # Compute loss with temporal consistency
-            print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
+            #print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
             loss = criterion(output, hr_frames, prev_output)
             
             # Backpropagation and optimization
@@ -47,6 +115,8 @@ def train(model, train_loader, criterion, optimizer, epoch, device, scale_factor
             running_loss += loss.item()
             pbar.set_postfix(loss=running_loss / (i + 1))
     
+    epoch_time = time.time() - start_time
+    print(f"Epoch training time: {epoch_time:.2f} seconds ({epoch_time/60:.2f} minutes)")
     return running_loss / len(train_loader)
 
 # Validation function
@@ -75,7 +145,7 @@ def validate(model, val_loader, criterion, device, scale_factor):
             
             # Reshape back to [B, T, C, H, W]
             output = output.view(B, T, C, target_H, target_W) 
-            print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
+            #print(f"[DEBUG] output: {output.shape}, hr: {hr_frames.shape}")
             # Compute loss
             loss = criterion(output, hr_frames, prev_output)
             val_loss += loss.item()

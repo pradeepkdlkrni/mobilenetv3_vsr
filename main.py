@@ -16,13 +16,14 @@ import argparse
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 from os import chdir, getcwd
+import time
 
 #%% Cell 2
 # Import model components
 from model import VideoSuperResolution
 from dataset import VideoDataset
 from loss import CombinedLoss
-from train import train, validate, test
+from train import train, validate, test, measure_inference_time
 from utils import train_transform, valid_transform
 
 #%% Cell 2
@@ -39,7 +40,7 @@ np.random.seed(42)
 #%% Cell 4
 # Define device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
+#print(f"Using device: {device}")
 #%% Cell 5
 # Define hyperparameters
 BATCH_SIZE = 4
@@ -64,11 +65,11 @@ BATCH_SIZE = args.batch_size
 LEARNING_RATE = args.lr
 SEQUENCE_LENGTH = args.sequence_length
 
-print(f"Training with scale factor: {SCALE_FACTOR}x")
-print(f"Sequence length: {SEQUENCE_LENGTH}")
-print(f"Number of epochs: {NUM_EPOCHS}")
-print(f"Batch size: {BATCH_SIZE}")
-print(f"Learning rate: {LEARNING_RATE}")
+#print(f"Training with scale factor: {SCALE_FACTOR}x")
+#print(f"Sequence length: {SEQUENCE_LENGTH}")
+#print(f"Number of epochs: {NUM_EPOCHS}")
+#print(f"Batch size: {BATCH_SIZE}")
+#print(f"Learning rate: {LEARNING_RATE}")
 
 #%%
 import cv2
@@ -201,6 +202,8 @@ def main():
     val_psnrs = []
     best_psnr = 0.0
 
+    epoch_times = []  # Track epoch times
+
     # Create directory for checkpoints with scale factor in name
     checkpoint_dir = f'checkpoints_scale{SCALE_FACTOR}x'
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -208,6 +211,7 @@ def main():
     # Training loop
     #print("NUM_EPOCHS = ", NUM_EPOCHS )
     #print("model ==", model)
+    total_training_start  = time.time()
     for epoch in range(NUM_EPOCHS):
         # Train
         train_loss = train(model, train_loader, criterion, optimizer, epoch, device, SCALE_FACTOR)
@@ -247,6 +251,15 @@ def main():
                 'scale_factor': SCALE_FACTOR,
             }, f'{checkpoint_dir}/model_epoch_{epoch+1}.pth')
     
+    total_training_time = time.time() - total_training_start
+  #  avg_epoch_time = sum(epoch_times) / len(epoch_times)
+    
+    print(f"\nTraining Performance Summary:")
+    print(f"Total training time: {total_training_time:.2f} seconds ({total_training_time/60:.2f} minutes)")
+  #  print(f"Average time per epoch: {avg_epoch_time:.2f} seconds ({avg_epoch_time/60:.2f} minutes)")
+   # print(f"Fastest epoch: {min(epoch_times):.2f} seconds")
+   # print(f"Slowest epoch: {max(epoch_times):.2f} seconds")
+
 
     # Plot training and validation losses
     plt.figure(figsize=(10, 5))
@@ -282,6 +295,10 @@ def main():
     avg_psnr, avg_ssim = test(model, test_loader, device,SCALE_FACTOR, save_path=results_dir)
     print(f"Test Results ({SCALE_FACTOR}x) - Average PSNR: {avg_psnr:.2f}dB, Average SSIM: {avg_ssim:.4f}")
 
+    # After testing is complete, measure inference time
+    print("\nMeasuring inference performance...")
+    inference_time, avg_frame_time, fps = measure_inference_time(model, test_loader, device, SCALE_FACTOR)
+    
     # Call visualization after testing
     visualize_sr_results(model, test_loader, device)
 
