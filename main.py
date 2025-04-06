@@ -190,7 +190,7 @@ def main():
     
     # Check sample batch shapes
     for lr_frames, hr_frames in train_loader:
-        print(f"LR input shape: {lr_frames.shape}")  # [batch_size, sequence_length, channels, height, width]
+        print(f"LR input shape: {lr_frames.shape}")  # Expected: [batch_size, sequence_length, channels, height, width]
         print(f"HR target shape: {hr_frames.shape}")
         print(f"Scale factor verification: HR height / LR height = {hr_frames.shape[3] / lr_frames.shape[3]}")
         print(f"Scale factor verification: HR width / LR width = {hr_frames.shape[4] / lr_frames.shape[4]}")
