@@ -5,11 +5,12 @@ import numpy as np
 from torch.utils.data import Dataset
 
 class VideoDataset(Dataset):
-    def __init__(self, lr_folder, hr_folder, sequence_length=5, transform=None):
+    def __init__(self, lr_folder, hr_folder, sequence_length=5, transform=None, scale_factor=4):
         self.lr_folder = lr_folder
         self.hr_folder = hr_folder
         self.sequence_length = sequence_length
         self.transform = transform
+        self.scale_factor = scale_factor
         
         # For Vimeo septuplet structure: 
         # F://vimeo_septuplet_full//Arranged//train//lr//00001_0003//frame_00001.png
@@ -75,6 +76,12 @@ class VideoDataset(Dataset):
             if lr_frame is None:
                 raise ValueError(f"Could not read image at {lr_path}")
             lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
+            height, width, channels = lr_frame.shape
+            print(f"before resizing : lr_frame Width: {width}, Height: {height}, Channels: {channels}")
+    
+    
+          
+           
             
             # Load HR frame
             hr_path = os.path.join(self.hr_folder, seq_folder, hr_frames_list[i])
@@ -83,6 +90,37 @@ class VideoDataset(Dataset):
                 raise ValueError(f"Could not read image at {hr_path}")
             hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
             
+            height, width, channels = hr_frame.shape
+            print(f"before resizing hr_frame Width: {width}, Height: {height}, Channels: {channels}")
+    
+            
+            
+            h, w = hr_frame.shape[:2]
+            h = (h // self.scale_factor) * self.scale_factor
+            w = (w // self.scale_factor) * self.scale_factor
+            print("resize to h =, w= ,", h, w)
+            hr_frame = cv2.resize(hr_frame, (w, h), interpolation=cv2.INTER_CUBIC)
+
+
+            lr_w, lr_h = w // self.scale_factor, h // self.scale_factor
+            lr_frame = cv2.resize(lr_frame, (lr_w, lr_h), interpolation=cv2.INTER_CUBIC)
+            
+            height, width, channels = lr_frame.shape
+            print(f"after resizing : lr_frame Width: {width}, Height: {height}, Channels: {channels}")
+    
+    
+            height, width, channels = hr_frame.shape
+            print(f"after hr_frame Width: {width}, Height: {height}, Channels: {channels}")
+    
+    
+    
+            print(f"[DEBUG] self.transform = {self.transform}, type = {type(self.transform)}")
+            
+            
+            assert hr_frame.shape[0] == lr_frame.shape[0] * self.scale_factor
+            assert hr_frame.shape[1] == lr_frame.shape[1] * self.scale_factor
+
+            '''
             # Apply transforms
             if self.transform:
                 # Check if transform is a tuple of (lr_transform, hr_transform)
@@ -90,15 +128,28 @@ class VideoDataset(Dataset):
                     lr_transform, hr_transform = self.transform
                     lr_frame = lr_transform(lr_frame)
                     hr_frame = hr_transform(hr_frame)
-                else:
-                    # Apply the same transform to both
+                elif callable(self.transform):
+                    # Apply the same transform to both if it's a single callable transform
                     lr_frame = self.transform(lr_frame)
                     hr_frame = self.transform(hr_frame)
-            else:
-                # Convert to tensor and normalize to [0, 1]
-                lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
-                hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
+                else:
+                    # Fallback to manual conversion if transform is neither tuple nor callable
+                    lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
+                    hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
+            '''           
             
+            if self.transform:
+               if isinstance(self.transform, tuple) and len(self.transform) == 2:
+                        lr_frame = self.transform[0](lr_frame)
+                        hr_frame = self.transform[1](hr_frame)
+               elif callable(self.transform):
+                        lr_frame = self.transform(lr_frame)
+                        hr_frame = self.transform(hr_frame)
+               else:
+                        # Default conversion to Tensor if no transform given
+                        lr_frame = torch.from_numpy(lr_frame.transpose(2, 0, 1)).float() / 255.0
+                        hr_frame = torch.from_numpy(hr_frame.transpose(2, 0, 1)).float() / 255.0
+                
             lr_sequence.append(lr_frame)
             hr_sequence.append(hr_frame)
         

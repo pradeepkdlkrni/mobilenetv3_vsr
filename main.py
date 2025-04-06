@@ -45,6 +45,10 @@ BATCH_SIZE = 4
 LEARNING_RATE = 1e-4
 NUM_EPOCHS = 5
 SCALE_FACTOR = 32  # Super-resolution scale factor
+
+#32 means 4 x upscaling.
+
+
 SEQUENCE_LENGTH = 5  # Number of consecutive frames to process
 #%%
 import cv2
@@ -134,21 +138,21 @@ def main():
         lr_folder=train_lr_path,
         hr_folder=train_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(train_transform_lr, train_transform_hr)
+        transform=(train_transform_lr, train_transform_hr,SCALE_FACTOR)
     )
     
     val_dataset = VideoDataset(
         lr_folder=val_lr_path,
         hr_folder=val_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr)
+        transform=(valid_transform_lr, valid_transform_hr,SCALE_FACTOR)
     )
     
     test_dataset = VideoDataset(
         lr_folder=test_lr_path,
         hr_folder=test_hr_path,
         sequence_length=SEQUENCE_LENGTH,
-        transform=(valid_transform_lr, valid_transform_hr)
+        transform=(valid_transform_lr, valid_transform_hr,SCALE_FACTOR)
     )
     
     print(f"Train dataset size: {len(train_dataset)}")
