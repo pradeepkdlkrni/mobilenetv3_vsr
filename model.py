@@ -91,7 +91,7 @@ class ReconstructionModule(nn.Module):
 
         self.conv1 = nn.Conv2d(in_channels, FEATURE_CHANNELS, kernel_size=3, padding=1)
         self.res_blocks = nn.Sequential(*[ResidualBlock(FEATURE_CHANNELS) for _ in range(5)])
-
+        print("num_upscales=", num_upscales)
         up_layers = []
         for _ in range(num_upscales):
             up_layers += [

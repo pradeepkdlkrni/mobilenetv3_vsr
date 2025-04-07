@@ -29,7 +29,7 @@ def measure_inference_time(model, test_loader, device, scale_factor, num_frames=
     # Warmup phase (to ensure GPU is ready)
     print("Warming up...")
     with torch.no_grad():
-        for lr_frames, _ in test_loader:
+        for lr_frames, dum1,dummy2 ,  in test_loader:
             if batch_count >= 3:  # 3 batches for warmup
                 break
             lr_frames = lr_frames.to(device)
@@ -40,7 +40,7 @@ def measure_inference_time(model, test_loader, device, scale_factor, num_frames=
     print("Measuring inference time...")
     batch_count = 0
     with torch.no_grad():
-        for lr_frames, _ in test_loader:
+        for lr_frames, dum1,dummy2 , in test_loader:
             lr_frames = lr_frames.to(device)
             
             batch_size, seq_len = lr_frames.shape[0], lr_frames.shape[1]
@@ -88,7 +88,7 @@ def train(model, train_loader, criterion, optimizer, epoch, device, scale_factor
     
     start_time = time.time()
     with tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}") as pbar:
-        for i, (lr_frames, hr_frames) in enumerate(pbar):
+        for i, (lr_frames, hr_frames, lr_paths) in enumerate(pbar):
             # Move data to device
             lr_frames = lr_frames.to(device)
             hr_frames = hr_frames.to(device)
@@ -127,7 +127,7 @@ def validate(model, val_loader, criterion, device, scale_factor):
     prev_output = None
     
     with torch.no_grad():
-        for lr_frames, hr_frames in val_loader:
+        for lr_frames, hr_frames, dummy in val_loader:
             lr_frames = lr_frames.to(device)
             hr_frames = hr_frames.to(device)
             
@@ -199,7 +199,7 @@ def test(model, test_loader, device, scale_factor, save_path='results'):
     ssim_values = []
     
     with torch.no_grad():
-        for batch_idx, (lr_frames, hr_frames) in enumerate(test_loader):
+        for batch_idx, (lr_frames, hr_frames, dummy) in enumerate(test_loader):
             lr_frames = lr_frames.to(device)
             hr_frames = hr_frames.to(device)
             

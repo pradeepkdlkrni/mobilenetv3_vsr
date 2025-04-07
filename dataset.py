@@ -74,15 +74,19 @@ class VideoDataset(Dataset):
             if hr_frame is None:
                 raise ValueError(f"Could not read image at {hr_path}")
             hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
-            
+            h, w = hr_frame.shape[:2]
+            #print("hr frame size just reading from disk:heigth = ",h,"width=", w)
             # Calculate dimensions that are divisible by scale_factor
             h, w = hr_frame.shape[:2]
             h = (h // self.scale_factor) * self.scale_factor
             w = (w // self.scale_factor) * self.scale_factor
             
             # Resize HR frame to ensure it's divisible by scale_factor
-            hr_frame = cv2.resize(hr_frame, (w, h), interpolation=cv2.INTER_CUBIC)
             
+            hr_frame = cv2.resize(hr_frame, (w, h), interpolation=cv2.INTER_CUBIC)
+            hr_frame = hr_frame.astype(np.float32) / 255.0
+            hp, wp = hr_frame.shape[:2]
+            #print("hr_frame size just after resize height= ",hp, "width=",wp)
             # Calculate LR dimensions
             lr_w, lr_h = w // self.scale_factor, h // self.scale_factor
             
@@ -92,8 +96,27 @@ class VideoDataset(Dataset):
             if lr_frame is None:
                 raise ValueError(f"Could not read image at {lr_path}")
             lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
-            lr_frame = cv2.resize(lr_frame, (lr_w, lr_h), interpolation=cv2.INTER_CUBIC)
-            
+            lr_hp, lr_wp = lr_frame.shape[:2]
+            #print("lr frame size just reading from disk: height= ",lr_hp, "width=",lr_wp)
+
+
+            #lr_frame = cv2.resize(lr_frame, (lr_w, lr_h), interpolation=cv2.INTER_CUBIC)
+            lr_frame = lr_frame.astype(np.float32) / 255.0
+            lr_hp, lr_wp = lr_frame.shape[:2]
+            #print("lr frame size just after resize height= ",lr_hp, "width=",lr_wp)
+            #print("self.scale_factor = ", self.scale_factor)
+
+            expected_lr_size = (h // self.scale_factor, w // self.scale_factor)
+            actual_lr_size = lr_frame.shape[:2]
+
+            if actual_lr_size != expected_lr_size:
+                #print(f"[INFO] Auto-generating LR from HR for scale={self.scale_factor}")
+                lr_frame = cv2.resize(hr_frame, (expected_lr_size[1], expected_lr_size[0]), interpolation=cv2.INTER_CUBIC)
+                lr_hp, lr_wp = lr_frame.shape[:2]
+                #print("lr frame size just after resize height= ",lr_hp, "width=",lr_wp, " this is only the case when to support all the scale factor")
+                #print("self.scale_factor = ", self.scale_factor)
+
+
             # Verify dimensions match the expected scale factor relationship
             assert hr_frame.shape[0] == lr_frame.shape[0] * self.scale_factor
             assert hr_frame.shape[1] == lr_frame.shape[1] * self.scale_factor
@@ -121,5 +144,5 @@ class VideoDataset(Dataset):
         # Stack frames into tensors
         lr_sequence = torch.stack(lr_sequence)
         hr_sequence = torch.stack(hr_sequence)
-        
-        return lr_sequence, hr_sequence
+        lr_paths = [os.path.join(self.lr_folder, seq_folder, fname) for fname in lr_frames_list]
+        return lr_sequence, hr_sequence, lr_paths

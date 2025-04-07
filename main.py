@@ -78,7 +78,7 @@ import numpy as np
 
 # Define path to save SR images
 os.makedirs('results', exist_ok=True)
-
+'''
 def visualize_sr_results(model, test_loader, device, num_videos=3):
     """Visualizes and saves SR frames from the test set."""
     model.eval()
@@ -126,6 +126,55 @@ def visualize_sr_results(model, test_loader, device, num_videos=3):
             
             if vid_idx == num_videos - 1:  # Stop after visualizing a few videos
                 break
+'''
+def visualize_sr_results(model, test_loader, device, num_videos=3):
+    model.eval()
+    with torch.no_grad():
+        for vid_idx, (lr_frames, hr_frames, lr_paths_batch) in enumerate(test_loader):  # lr_paths added!
+            print("lr_paths_batch type:", type(lr_paths_batch))
+            print("len(lr_paths_batch):", len(lr_paths_batch))
+            print("lr_paths_batch[0]:", lr_paths_batch[0])
+
+            lr_paths = lr_paths_batch  # Unpack single batch element
+            lr_frames = lr_frames.to(device)
+            sr_frames = model(lr_frames)
+
+            for frame_idx in range(lr_frames.shape[1]):
+                # Load original LR image from path
+                lr_path = lr_paths[frame_idx][0]  # batch index 0
+                original_lr_image = cv2.imread(lr_path)
+                original_lr_image = cv2.cvtColor(original_lr_image, cv2.COLOR_BGR2RGB)
+
+                sr_image = sr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
+                hr_image = hr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
+
+                sr_image = np.clip(sr_image * 255.0, 0, 255).astype(np.uint8)
+                hr_image = np.clip(hr_image * 255.0, 0, 255).astype(np.uint8)
+
+                # Save visuals
+                cv2.imwrite(f"results/lr_orig_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(original_lr_image, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(f"results/sr_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png", cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(f"results/hr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(hr_image, cv2.COLOR_RGB2BGR))
+
+                if vid_idx < num_videos and frame_idx < 3:
+                    plt.figure(figsize=(15, 5))
+                    plt.subplot(1, 3, 1)
+                    plt.imshow(original_lr_image)
+                    plt.title(f"Original LR ({original_lr_image.shape[1]}x{original_lr_image.shape[0]})")
+                    plt.axis("off")
+
+                    plt.subplot(1, 3, 2)
+                    plt.imshow(sr_image)
+                    plt.title(f"Super-Res {SCALE_FACTOR}x ({sr_image.shape[1]}x{sr_image.shape[0]})")
+                    plt.axis("off")
+
+                    plt.subplot(1, 3, 3)
+                    plt.imshow(hr_image)
+                    plt.title(f"High-Res GT ({hr_image.shape[1]}x{hr_image.shape[0]})")
+                    plt.axis("off")
+
+                    plt.savefig(f"results/comparison_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png")
+                    plt.show()
 
 
 #%% Cell 7
@@ -142,7 +191,7 @@ def main():
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
 
     # Define dataset paths
-    base_path = "F://vimeo_septuplet_full//Arranged_small//"
+    base_path = "F://vimeo_septuplet_full//Arranged_small"
     train_lr_path = os.path.join(base_path, "train", "lr")
     train_hr_path = os.path.join(base_path, "train", "hr")
     val_lr_path = os.path.join(base_path, "val", "lr")
@@ -189,7 +238,7 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
     
     # Check sample batch shapes
-    for lr_frames, hr_frames in train_loader:
+    for lr_frames, hr_frames, lr_paths  in train_loader:
         print(f"LR input shape: {lr_frames.shape}")  # [batch_size, sequence_length, channels, height, width]
         print(f"HR target shape: {hr_frames.shape}")
         print(f"Scale factor verification: HR height / LR height = {hr_frames.shape[3] / lr_frames.shape[3]}")
