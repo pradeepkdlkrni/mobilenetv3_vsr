@@ -7,7 +7,7 @@ from torchvision.models import vgg16, VGG16_Weights
 class ReconstructionLoss(nn.Module):
     def __init__(self):
         super(ReconstructionLoss, self).__init__()
-        self.mse_loss = nn.MSELoss()
+        self.mse_loss = nn.L1Loss()
         
     def forward(self, output, target):
         """
@@ -55,7 +55,7 @@ class PerceptualLoss(nn.Module):
         output_features = self.feature_extractor(output)
         target_features = self.feature_extractor(target)
         
-        return F.mse_loss(output_features, target_features)
+        return F.l1_loss(output_features, target_features)
 
 class TemporalConsistencyLoss(nn.Module):
     def __init__(self):

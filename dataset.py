@@ -25,9 +25,9 @@ class ScaleAwarePairAligner:
         if hr_h == expected_hr_h and hr_w == expected_hr_w:
             return hr_img, lr_img  # Perfect match
 
-        if self.verbose:
-            print(f"[ScaleAlign] Mismatch for scale={self.scale}")
-            print(f"  HR size: ({hr_h}, {hr_w}), LR*scale: ({expected_hr_h}, {expected_hr_w})")
+        #if self.verbose:
+            ##print(f"[ScaleAlign] Mismatch for scale={self.scale}")
+            ##print(f"  HR size: ({hr_h}, {hr_w}), LR*scale: ({expected_hr_h}, {expected_hr_w})")
 
         if self.method == 'crop' or (self.method == 'hybrid' and hr_h >= expected_hr_h and hr_w >= expected_hr_w):
             min_h = min(hr_h, expected_hr_h)
@@ -47,6 +47,11 @@ class ScaleAwarePairAligner:
             regenerated_lr = cv2.resize(resized_hr, (lr_w, lr_h), interpolation=cv2.INTER_AREA)
             return resized_hr, regenerated_lr
 
+        if self.method == 'resize':
+            resized_hr = cv2.resize(hr_img, (lr_w * self.scale, lr_h * self.scale), interpolation=cv2.INTER_CUBIC)
+            regenerated_lr = cv2.resize(resized_hr, (lr_w, lr_h), interpolation=cv2.INTER_AREA)
+            return resized_hr, regenerated_lr
+
         else:
             raise ValueError(f"Unknown method '{self.method}'. Use 'crop', 'resize', or 'hybrid'.")
 # === END: Utility class ===
@@ -58,7 +63,7 @@ class VideoDataset(Dataset):
         self.sequence_length = sequence_length
         self.transform = transform
         self.scale_factor = scale_factor
-        self.pair_aligner = ScaleAwarePairAligner(scale_factor)
+        self.pair_aligner = ScaleAwarePairAligner(scale_factor, method='resize')
         
         # Get video sequence folders (00001_0003, etc.)
         self.sequence_folders = sorted([f for f in os.listdir(lr_folder) 
@@ -67,8 +72,8 @@ class VideoDataset(Dataset):
         if len(self.sequence_folders) == 0:
             raise ValueError(f"No subdirectories found in {lr_folder}. Check your path.")
             
-        print(f"Found {len(self.sequence_folders)} sequence folders in {lr_folder}")
-        print(f"Using scale factor: {scale_factor}x")
+        ##print(f"Found {len(self.sequence_folders)} sequence folders in {lr_folder}")
+        ##print(f"Using scale factor: {scale_factor}x")
         
         # Create mapping for efficient retrieval
         self.valid_sequences = []
@@ -79,7 +84,7 @@ class VideoDataset(Dataset):
             
             # Ensure both LR and HR folders for this sequence exist
             if not os.path.exists(hr_seq_path):
-                print(f"Warning: HR folder {hr_seq_path} does not exist, skipping sequence {seq_folder}")
+                #print(f"Warning: HR folder {hr_seq_path} does not exist, skipping sequence {seq_folder}")
                 continue
                 
             # Get frames in this sequence
@@ -97,7 +102,7 @@ class VideoDataset(Dataset):
                 'hr_frames': hr_frames[:sequence_length]
             })
         
-        print(f"Total valid sequences: {len(self.valid_sequences)}")
+        #print(f"Total valid sequences: {len(self.valid_sequences)}")
         
         if len(self.valid_sequences) == 0:
             raise ValueError(f"No valid sequences found that contain {sequence_length} frames in both LR and HR.")
@@ -125,12 +130,12 @@ class VideoDataset(Dataset):
             hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
             
             hr_h, hr_w = hr_frame.shape[:2]
-            print(" hr_frame size just after reading from disk,  height = ", hr_h , "width=", hr_w)
+            #print(" hr_frame size just after reading from disk,  height = ", hr_h , "width=", hr_w)
             # Load LR
             lr_frame = cv2.imread(lr_path)
             lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
             lr_h, lr_w = lr_frame.shape[:2]
-            print(" lr size just after reading from disk,  height = ", lr_h , "width=", lr_w)
+            #print(" lr size just after reading from disk,  height = ", lr_h , "width=", lr_w)
 
             # Verify: Do they match scale?
             hr_frame, lr_frame = self.pair_aligner(hr_frame, lr_frame)

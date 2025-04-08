@@ -4,31 +4,19 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import models
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
+
 FEATURE_CHANNELS = 64
 
 class MobileNetV3FeatureExtractor(nn.Module):
     def __init__(self, pretrained=True):
         super(MobileNetV3FeatureExtractor, self).__init__()
 
-        if pretrained:
-            weights = MobileNet_V3_Small_Weights.DEFAULT
-        else:
-            weights = None
-
-        mobilenet = mobilenet_v3_small(weights=weights)
+        mobilenet = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT if pretrained else None)
         self.features = nn.Sequential(*list(mobilenet.features.children())[:6])
 
-        if pretrained:
-            for param in self.features.parameters():
-                param.requires_grad = False
-
-    def forward(self, x, scale=4):
-        x = self.features(x)
-        B, C, H, W = x.shape
-        x = F.interpolate(x, scale_factor=scale, mode='bilinear', align_corners=False)
-        return x
+    def forward(self, x):
+        return self.features(x)
 
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
@@ -90,8 +78,11 @@ class ReconstructionModule(nn.Module):
         assert 2 ** num_upscales == scale_factor, "scale_factor must be a power of 2"
 
         self.conv1 = nn.Conv2d(in_channels, FEATURE_CHANNELS, kernel_size=3, padding=1)
-        self.res_blocks = nn.Sequential(*[ResidualBlock(FEATURE_CHANNELS) for _ in range(5)])
-        print("num_upscales=", num_upscales)
+
+        # Dynamic residual block depth based on scale
+        block_depth = 3 if scale_factor <= 2 else 5 if scale_factor <= 4 else 8
+        self.res_blocks = nn.Sequential(*[ResidualBlock(FEATURE_CHANNELS) for _ in range(block_depth)])
+
         up_layers = []
         for _ in range(num_upscales):
             up_layers += [
@@ -112,18 +103,31 @@ class ReconstructionModule(nn.Module):
 class VideoSuperResolution(nn.Module):
     def __init__(self, scale_factor=4):
         super(VideoSuperResolution, self).__init__()
+        self.scale_factor = scale_factor
+
         self.feature_extractor = MobileNetV3FeatureExtractor(pretrained=True)
         with torch.no_grad():
-            sample_input = torch.randn(1, 3, 64, 64)
-            features = self.feature_extractor(sample_input)
-            feature_channels = features.shape[1]
+            dummy = torch.randn(1, 3, 64, 64)
+            feature_channels = self.feature_extractor(dummy).shape[1]
+
+        self.feature_refiner = nn.Sequential(
+            ResidualBlock(feature_channels),
+            ResidualBlock(feature_channels)
+        )
 
         self.temporal_module = TemporalConsistencyModule(feature_channels)
-        self.fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
+
+        # Spatial and temporal fusion split
+        self.spatial_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
+        self.temporal_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
+
         self.reconstruction = ReconstructionModule(feature_channels, scale_factor)
         self.prev_features = None
 
-    def forward(self, x, scale_factor=4, reset_state=True):
+    def forward(self, x, scale_factor=None, reset_state=True):
+        if scale_factor is None:
+            scale_factor = self.scale_factor
+
         batch_size, seq_len, c, h, w = x.shape
         outputs = []
 
@@ -133,11 +137,24 @@ class VideoSuperResolution(nn.Module):
         for t in range(seq_len):
             current_frame = x[:, t, :, :, :]
             current_features = self.feature_extractor(current_frame)
-            temporally_consistent_features = self.temporal_module(current_features, self.prev_features)
-            self.prev_features = current_features.detach()
+            current_features = self.feature_refiner(current_features)
 
-            fused_features = self.fusion(temporally_consistent_features)
+            temporal_out = self.temporal_module(current_features, self.prev_features)
+            if self.prev_features is not None:
+                temporal_out = temporal_out + self.prev_features
+            self.prev_features = temporal_out.detach()
+
+            fused_features = self.spatial_fusion(current_features) + self.temporal_fusion(temporal_out)
+
+            # Add residual skip from LR input
+            upsampled_lr = F.interpolate(current_frame, scale_factor=scale_factor, mode='bilinear', align_corners=False)
             sr_frame = self.reconstruction(fused_features)
+            
+            if sr_frame.shape != upsampled_lr.shape:
+               upsampled_lr = F.interpolate(upsampled_lr, size=sr_frame.shape[2:], mode='bilinear', align_corners=False)
+			
+            sr_frame = sr_frame + upsampled_lr
+
             outputs.append(sr_frame)
 
         return torch.stack(outputs, dim=1)
