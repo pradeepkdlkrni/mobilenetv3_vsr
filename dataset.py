@@ -3,6 +3,53 @@ import torch
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
+import cv2
+import numpy as np
+import torch
+# Other imports...
+
+# === BEGIN: Utility class to fix HR/LR scale mismatches ===
+class ScaleAwarePairAligner:
+    def __init__(self, scale_factor, method='hybrid', verbose=False):
+        self.scale = scale_factor
+        self.method = method
+        self.verbose = verbose
+
+    def __call__(self, hr_img, lr_img):
+        hr_h, hr_w = hr_img.shape[:2]
+        lr_h, lr_w = lr_img.shape[:2]
+
+        expected_hr_h = lr_h * self.scale
+        expected_hr_w = lr_w * self.scale
+
+        if hr_h == expected_hr_h and hr_w == expected_hr_w:
+            return hr_img, lr_img  # Perfect match
+
+        if self.verbose:
+            print(f"[ScaleAlign] Mismatch for scale={self.scale}")
+            print(f"  HR size: ({hr_h}, {hr_w}), LR*scale: ({expected_hr_h}, {expected_hr_w})")
+
+        if self.method == 'crop' or (self.method == 'hybrid' and hr_h >= expected_hr_h and hr_w >= expected_hr_w):
+            min_h = min(hr_h, expected_hr_h)
+            min_w = min(hr_w, expected_hr_w)
+            min_h = (min_h // self.scale) * self.scale
+            min_w = (min_w // self.scale) * self.scale
+
+            cropped_hr = hr_img[:min_h, :min_w]
+            cropped_lr = lr_img[:min_h // self.scale, :min_w // self.scale]
+            return cropped_hr, cropped_lr
+
+        elif self.method in ['resize', 'hybrid']:
+            new_hr_h = lr_h * self.scale
+            new_hr_w = lr_w * self.scale
+
+            resized_hr = cv2.resize(hr_img, (new_hr_w, new_hr_h), interpolation=cv2.INTER_CUBIC)
+            regenerated_lr = cv2.resize(resized_hr, (lr_w, lr_h), interpolation=cv2.INTER_AREA)
+            return resized_hr, regenerated_lr
+
+        else:
+            raise ValueError(f"Unknown method '{self.method}'. Use 'crop', 'resize', or 'hybrid'.")
+# === END: Utility class ===
 
 class VideoDataset(Dataset):
     def __init__(self, lr_folder, hr_folder, sequence_length=5, transform=None, scale_factor=4):
@@ -11,6 +58,7 @@ class VideoDataset(Dataset):
         self.sequence_length = sequence_length
         self.transform = transform
         self.scale_factor = scale_factor
+        self.pair_aligner = ScaleAwarePairAligner(scale_factor)
         
         # Get video sequence folders (00001_0003, etc.)
         self.sequence_folders = sorted([f for f in os.listdir(lr_folder) 
@@ -70,52 +118,24 @@ class VideoDataset(Dataset):
         for i in range(self.sequence_length):
             # Load HR frame first to determine dimensions
             hr_path = os.path.join(self.hr_folder, seq_folder, hr_frames_list[i])
-            hr_frame = cv2.imread(hr_path)
-            if hr_frame is None:
-                raise ValueError(f"Could not read image at {hr_path}")
-            hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
-            h, w = hr_frame.shape[:2]
-            #print("hr frame size just reading from disk:heigth = ",h,"width=", w)
-            # Calculate dimensions that are divisible by scale_factor
-            h, w = hr_frame.shape[:2]
-            h = (h // self.scale_factor) * self.scale_factor
-            w = (w // self.scale_factor) * self.scale_factor
-            
-            # Resize HR frame to ensure it's divisible by scale_factor
-            
-            hr_frame = cv2.resize(hr_frame, (w, h), interpolation=cv2.INTER_CUBIC)
-            hr_frame = hr_frame.astype(np.float32) / 255.0
-            hp, wp = hr_frame.shape[:2]
-            #print("hr_frame size just after resize height= ",hp, "width=",wp)
-            # Calculate LR dimensions
-            lr_w, lr_h = w // self.scale_factor, h // self.scale_factor
-            
-            # Load and resize LR frame
             lr_path = os.path.join(self.lr_folder, seq_folder, lr_frames_list[i])
+            
+            # Load HR
+            hr_frame = cv2.imread(hr_path)
+            hr_frame = cv2.cvtColor(hr_frame, cv2.COLOR_BGR2RGB)
+            
+            hr_h, hr_w = hr_frame.shape[:2]
+            print(" hr_frame size just after reading from disk,  height = ", hr_h , "width=", hr_w)
+            # Load LR
             lr_frame = cv2.imread(lr_path)
-            if lr_frame is None:
-                raise ValueError(f"Could not read image at {lr_path}")
             lr_frame = cv2.cvtColor(lr_frame, cv2.COLOR_BGR2RGB)
-            lr_hp, lr_wp = lr_frame.shape[:2]
-            #print("lr frame size just reading from disk: height= ",lr_hp, "width=",lr_wp)
+            lr_h, lr_w = lr_frame.shape[:2]
+            print(" lr size just after reading from disk,  height = ", lr_h , "width=", lr_w)
 
+            # Verify: Do they match scale?
+            hr_frame, lr_frame = self.pair_aligner(hr_frame, lr_frame)
 
-            #lr_frame = cv2.resize(lr_frame, (lr_w, lr_h), interpolation=cv2.INTER_CUBIC)
-            lr_frame = lr_frame.astype(np.float32) / 255.0
-            lr_hp, lr_wp = lr_frame.shape[:2]
-            #print("lr frame size just after resize height= ",lr_hp, "width=",lr_wp)
-            #print("self.scale_factor = ", self.scale_factor)
-
-            expected_lr_size = (h // self.scale_factor, w // self.scale_factor)
-            actual_lr_size = lr_frame.shape[:2]
-
-            if actual_lr_size != expected_lr_size:
-                #print(f"[INFO] Auto-generating LR from HR for scale={self.scale_factor}")
-                lr_frame = cv2.resize(hr_frame, (expected_lr_size[1], expected_lr_size[0]), interpolation=cv2.INTER_CUBIC)
-                lr_hp, lr_wp = lr_frame.shape[:2]
-                #print("lr frame size just after resize height= ",lr_hp, "width=",lr_wp, " this is only the case when to support all the scale factor")
-                #print("self.scale_factor = ", self.scale_factor)
-
+             
 
             # Verify dimensions match the expected scale factor relationship
             assert hr_frame.shape[0] == lr_frame.shape[0] * self.scale_factor
