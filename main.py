@@ -17,10 +17,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 from os import chdir, getcwd
 import time
-
+#from model_convgru_rrdb import VideoSuperResolution
+#from model_convgru_edsr import VideoSuperResolution
+#from model_convgru_se import VideoSuperResolution
+from model_se_hybrid import VideoSuperResolution
 #%% Cell 2
 # Import model components
-from model import VideoSuperResolution
+#from model import VideoSuperResolution
 from dataset import VideoDataset
 from loss import CombinedLoss
 from train import train, validate, test, measure_inference_time
@@ -28,9 +31,6 @@ from utils import train_transform, valid_transform
 
 #%% Cell 2
 # Import model components
-
-
-
 
 from utils import train_transform_lr, train_transform_hr, valid_transform_lr, valid_transform_hr
 #%% Cell 3
@@ -55,6 +55,8 @@ parser.add_argument('--epochs', type=int, default=5, help='Number of training ep
 parser.add_argument('--batch_size', type=int, default=4, help='Batch size for training')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
 parser.add_argument('--sequence_length', type=int, default=5, help='Number of consecutive frames to process')
+parser.add_argument('--output_dir', type=str, default=None, 
+                    help='Output directory for results and checkpoints (default: local directory)')
 
 args = parser.parse_args()
 
@@ -65,11 +67,30 @@ BATCH_SIZE = args.batch_size
 LEARNING_RATE = args.lr
 SEQUENCE_LENGTH = args.sequence_length
 
-#print(f"Training with scale factor: {SCALE_FACTOR}x")
-#print(f"Sequence length: {SEQUENCE_LENGTH}")
-#print(f"Number of epochs: {NUM_EPOCHS}")
-#print(f"Batch size: {BATCH_SIZE}")
-#print(f"Learning rate: {LEARNING_RATE}")
+# Set output directory - either from args or default to Google Drive location for Colab
+OUTPUT_DIR = args.output_dir
+if OUTPUT_DIR is None:
+    # Check if running in Google Colab
+    try:
+        from google.colab import drive
+        IN_COLAB = True
+    except:
+        IN_COLAB = False
+        
+    if IN_COLAB:
+        # Try to mount Google Drive if not already mounted
+        if not os.path.exists('/content/drive'):
+            #print("Mounting Google Drive...")
+            drive.mount('/content/drive')
+        
+        OUTPUT_DIR = '/content/drive/MyDrive/mobilenetv3_project_vsr'
+        #print(f"Google Colab detected. Results will be saved to: {OUTPUT_DIR}")
+    else:
+        OUTPUT_DIR = '.'  # Current directory if not in Colab
+        #print("Running locally. Results will be saved to current directory.")
+
+# Create the output directory if it doesn't exist
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 #%%
 import cv2
@@ -77,56 +98,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Define path to save SR images
-os.makedirs('results', exist_ok=True)
-'''
-def visualize_sr_results(model, test_loader, device, num_videos=3):
-    """Visualizes and saves SR frames from the test set."""
-    model.eval()
-    with torch.no_grad():
-        for vid_idx, (lr_frames, hr_frames) in enumerate(test_loader):
-            lr_frames = lr_frames.to(device)
-            sr_frames = model(lr_frames)  # Super-resolution
+RESULTS_DIR = os.path.join(OUTPUT_DIR, 'results')
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
-            # Convert tensors to NumPy images
-            for frame_idx in range(lr_frames.shape[1]):  # Iterate over frames
-                lr_image = lr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
-                sr_image = sr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
-                hr_image = hr_frames[0, frame_idx].cpu().numpy().transpose(1, 2, 0)
-
-                # Normalize images to 0-255
-                lr_image = np.clip(lr_image * 255.0, 0, 255).astype(np.uint8)
-                sr_image = np.clip(sr_image * 255.0, 0, 255).astype(np.uint8)
-                hr_image = np.clip(hr_image * 255.0, 0, 255).astype(np.uint8)
-
-                # Save images
-                cv2.imwrite(f"results/lr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(lr_image, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(f"results/sr_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png", cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(f"results/hr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(hr_image, cv2.COLOR_RGB2BGR))
-
-                # Display first few frames
-                if vid_idx < num_videos and frame_idx < 3:
-                    plt.figure(figsize=(15, 5))
-                    plt.subplot(1, 3, 1)
-                    plt.imshow(lr_image)
-                    plt.title(f"Low-Res ({lr_image.shape[1]}x{lr_image.shape[0]})")
-                    plt.axis("off")
-
-                    plt.subplot(1, 3, 2)
-                    plt.imshow(sr_image)
-                    plt.title(f"Super-Res {SCALE_FACTOR}x ({sr_image.shape[1]}x{sr_image.shape[0]})")
-                    plt.axis("off")
-
-                    plt.subplot(1, 3, 3)
-                    plt.imshow(hr_image)
-                    plt.title(f"High-Res GT ({hr_image.shape[1]}x{hr_image.shape[0]})")
-                    plt.axis("off")
-
-                    plt.savefig(f"results/comparison_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png")
-                    plt.show()
-            
-            if vid_idx == num_videos - 1:  # Stop after visualizing a few videos
-                break
-'''
 def visualize_sr_results(model, test_loader, device, num_videos=3):
     model.eval()
     with torch.no_grad():
@@ -151,10 +125,13 @@ def visualize_sr_results(model, test_loader, device, num_videos=3):
                 sr_image = np.clip(sr_image * 255.0, 0, 255).astype(np.uint8)
                 hr_image = np.clip(hr_image * 255.0, 0, 255).astype(np.uint8)
 
-                # Save visuals
-                cv2.imwrite(f"results/lr_orig_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(original_lr_image, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(f"results/sr_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png", cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
-                cv2.imwrite(f"results/hr_video{vid_idx}_frame{frame_idx}.png", cv2.cvtColor(hr_image, cv2.COLOR_RGB2BGR))
+                # Save visuals to Google Drive path
+                cv2.imwrite(os.path.join(RESULTS_DIR, f"lr_orig_video{vid_idx}_frame{frame_idx}.png"), 
+                           cv2.cvtColor(original_lr_image, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(RESULTS_DIR, f"sr_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png"), 
+                           cv2.cvtColor(sr_image, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(RESULTS_DIR, f"hr_video{vid_idx}_frame{frame_idx}.png"), 
+                           cv2.cvtColor(hr_image, cv2.COLOR_RGB2BGR))
 
                 if vid_idx < num_videos and frame_idx < 3:
                     plt.figure(figsize=(15, 5))
@@ -173,8 +150,11 @@ def visualize_sr_results(model, test_loader, device, num_videos=3):
                     plt.title(f"High-Res GT ({hr_image.shape[1]}x{hr_image.shape[0]})")
                     plt.axis("off")
 
-                    plt.savefig(f"results/comparison_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png")
-                    plt.show()
+                    plt.savefig(os.path.join(RESULTS_DIR, f"comparison_video{vid_idx}_frame{frame_idx}_scale{SCALE_FACTOR}x.png"))
+                    plt.close()  # Close the plot to avoid display in Colab
+
+            if vid_idx == num_videos - 1:  # Stop after visualizing a few videos
+                break
 
 
 #%% Cell 7
@@ -238,7 +218,7 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4)
     
     # Check sample batch shapes
-    for lr_frames, hr_frames, lr_paths  in train_loader:
+    for lr_frames, hr_frames, lr_paths in train_loader:
         print(f"LR input shape: {lr_frames.shape}")  # [batch_size, sequence_length, channels, height, width]
         print(f"HR target shape: {hr_frames.shape}")
         print(f"Scale factor verification: HR height / LR height = {hr_frames.shape[3] / lr_frames.shape[3]}")
@@ -254,14 +234,14 @@ def main():
     epoch_times = []  # Track epoch times
 
     # Create directory for checkpoints with scale factor in name
-    checkpoint_dir = f'checkpoints_scale{SCALE_FACTOR}x'
+    checkpoint_dir = os.path.join(OUTPUT_DIR, f'checkpoints_scale{SCALE_FACTOR}x')
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Training loop
-    #print("NUM_EPOCHS = ", NUM_EPOCHS )
-    #print("model ==", model)
-    total_training_start  = time.time()
+    total_training_start = time.time()
     for epoch in range(NUM_EPOCHS):
+        epoch_start = time.time()
+        
         # Train
         train_loss = train(model, train_loader, criterion, optimizer, epoch, device, SCALE_FACTOR)
         train_losses.append(train_loss)
@@ -274,8 +254,12 @@ def main():
         # Update learning rate
         scheduler.step()
         
+        # Calculate epoch time
+        epoch_time = time.time() - epoch_start
+        epoch_times.append(epoch_time)
+        
         # Print statistics
-        print(f'Epoch {epoch+1}/{NUM_EPOCHS} | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | Val PSNR: {val_psnr:.2f}dB')
+        print(f'Epoch {epoch+1}/{NUM_EPOCHS} | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | Val PSNR: {val_psnr:.2f}dB | Time: {epoch_time:.2f}s')
         
         # Save best model
         if val_psnr > best_psnr:
@@ -287,7 +271,7 @@ def main():
                 'scheduler_state_dict': scheduler.state_dict(),
                 'best_psnr': best_psnr,
                 'scale_factor': SCALE_FACTOR,
-            }, f'{checkpoint_dir}/best_model.pth')
+            }, os.path.join(checkpoint_dir, 'best_model.pth'))
             print(f'New best model saved with PSNR: {best_psnr:.2f}dB')
         
         # Save model periodically
@@ -298,17 +282,16 @@ def main():
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
                 'scale_factor': SCALE_FACTOR,
-            }, f'{checkpoint_dir}/model_epoch_{epoch+1}.pth')
+            }, os.path.join(checkpoint_dir, f'model_epoch_{epoch+1}.pth'))
     
     total_training_time = time.time() - total_training_start
-  #  avg_epoch_time = sum(epoch_times) / len(epoch_times)
+    avg_epoch_time = sum(epoch_times) / len(epoch_times)
     
     print(f"\nTraining Performance Summary:")
     print(f"Total training time: {total_training_time:.2f} seconds ({total_training_time/60:.2f} minutes)")
-  #  print(f"Average time per epoch: {avg_epoch_time:.2f} seconds ({avg_epoch_time/60:.2f} minutes)")
-   # print(f"Fastest epoch: {min(epoch_times):.2f} seconds")
-   # print(f"Slowest epoch: {max(epoch_times):.2f} seconds")
-
+    print(f"Average time per epoch: {avg_epoch_time:.2f} seconds ({avg_epoch_time/60:.2f} minutes)")
+    print(f"Fastest epoch: {min(epoch_times):.2f} seconds")
+    print(f"Slowest epoch: {max(epoch_times):.2f} seconds")
 
     # Plot training and validation losses
     plt.figure(figsize=(10, 5))
@@ -328,25 +311,37 @@ def main():
     plt.title(f'Validation PSNR ({SCALE_FACTOR}x)')
     
     plt.tight_layout()
-    plt.savefig(f'training_curves_scale{SCALE_FACTOR}x.png')
-    plt.show()
+    plt.savefig(os.path.join(OUTPUT_DIR, f'training_curves_scale{SCALE_FACTOR}x.png'))
+    plt.close()  # Close the figure to avoid displaying in Colab
     
     # Test the best model
     print("Loading best model for testing...")
-    checkpoint = torch.load(f'{checkpoint_dir}/best_model.pth')
+    checkpoint = torch.load(os.path.join(checkpoint_dir, 'best_model.pth'))
     model.load_state_dict(checkpoint['model_state_dict'])
     
     # Create results directory with scale factor
-    results_dir = f'results_scale{SCALE_FACTOR}x'
+    results_dir = os.path.join(OUTPUT_DIR, f'results_scale{SCALE_FACTOR}x')
     os.makedirs(results_dir, exist_ok=True)
     
     # Run test
-    avg_psnr, avg_ssim = test(model, test_loader, device,SCALE_FACTOR, save_path=results_dir)
+    avg_psnr, avg_ssim = test(model, test_loader, device, SCALE_FACTOR, save_path=results_dir)
     print(f"Test Results ({SCALE_FACTOR}x) - Average PSNR: {avg_psnr:.2f}dB, Average SSIM: {avg_ssim:.4f}")
 
     # After testing is complete, measure inference time
     print("\nMeasuring inference performance...")
     inference_time, avg_frame_time, fps = measure_inference_time(model, test_loader, device, SCALE_FACTOR)
+    
+    # Write performance metrics to a file
+    with open(os.path.join(OUTPUT_DIR, f'performance_metrics_scale{SCALE_FACTOR}x.txt'), 'w') as f:
+        f.write(f"Scale Factor: {SCALE_FACTOR}x\n")
+        f.write(f"Best PSNR: {best_psnr:.2f}dB\n")
+        f.write(f"Test PSNR: {avg_psnr:.2f}dB\n")
+        f.write(f"Test SSIM: {avg_ssim:.4f}\n")
+        f.write(f"Inference time (total): {inference_time:.2f}s\n")
+        f.write(f"Average time per frame: {avg_frame_time:.4f}s\n")
+        f.write(f"FPS: {fps:.2f}\n")
+        f.write(f"Total training time: {total_training_time:.2f}s ({total_training_time/60:.2f}min)\n")
+        f.write(f"Average epoch time: {avg_epoch_time:.2f}s\n")
     
     # Call visualization after testing
     visualize_sr_results(model, test_loader, device)

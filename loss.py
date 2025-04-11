@@ -4,6 +4,32 @@ import torch.nn.functional as F
 from torchvision import models
 from torchvision.models import vgg16, VGG16_Weights
 
+
+class CharbonnierLoss(nn.Module):
+    def __init__(self, eps=1e-6):
+        super(CharbonnierLoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, prediction, target):
+        return torch.mean(torch.sqrt((prediction - target) ** 2 + self.eps))
+
+class ReconstructionLoss(nn.Module):
+    def __init__(self):
+        super(ReconstructionLoss, self).__init__()
+        self.charbonnier = CharbonnierLoss()
+
+    def forward(self, output, target):
+        if output.shape != target.shape:
+            b, t, c, h, w = output.shape
+            _, _, _, target_h, target_w = target.shape
+            if h != target_h or w != target_w:
+                output_reshaped = output.view(-1, c, h, w)
+                output_resized = F.interpolate(output_reshaped, size=(target_h, target_w), mode='bilinear', align_corners=False)
+                output = output_resized.view(b, t, c, target_h, target_w)
+
+        return self.charbonnier(output, target)
+    
+'''
 class ReconstructionLoss(nn.Module):
     def __init__(self):
         super(ReconstructionLoss, self).__init__()
@@ -29,7 +55,7 @@ class ReconstructionLoss(nn.Module):
                 output = output_resized.view(b, t, c, target_h, target_w)
                 
         return self.mse_loss(output, target)
-
+'''
 class PerceptualLoss(nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()

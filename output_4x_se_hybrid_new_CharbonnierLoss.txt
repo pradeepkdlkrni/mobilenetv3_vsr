@@ -1,0 +1,23 @@
+Creating VSR model with 4x upscaling...
+Train dataset size: 14
+Validation dataset size: 11
+Test dataset size: 14
+LR input shape: torch.Size([4, 5, 3, 64, 112])
+HR target shape: torch.Size([4, 5, 3, 256, 448])
+Scale factor verification: HR height / LR height = 4.0
+Scale factor verification: HR width / LR width = 4.0
+Epoch training time: 104.71 seconds (1.75 minutes)
+Epoch 1/50 | Train Loss: 0.335979 | Val Loss: 0.361533 | Val PSNR: 8.88dB | Time: 158.04s
+New best model saved with PSNR: 8.88dB
+Epoch training time: 88.69 seconds (1.48 minutes)
+Epoch 2/50 | Train Loss: 0.293052 | Val Loss: 0.325247 | Val PSNR: 9.80dB | Time: 137.30s
+New best model saved with PSNR: 9.80dB
+Epoch training time: 88.96 seconds (1.48 minutes)
+Epoch 3/50 | Train Loss: 0.267959 | Val Loss: 0.277110 | Val PSNR: 11.21dB | Time: 137.41s
+New best model saved with PSNR: 11.21dB
+Epoch training time: 89.85 seconds (1.50 minutes)
+Epoch 4/50 | Train Loss: 0.226742 | Val Loss: 0.212679 | Val PSNR: 13.61dB | Time: 137.94s
+New best model saved with PSNR: 13.61dB
+Epoch training time: 97.06 seconds (1.62 minutes)
+Epoch 5/50 | Train Loss: 0.174772 | Val Loss: 0.154948 | Val PSNR: 16.50dB | Time: 150.46s
+New best model saved with PSNR: 16.50dB

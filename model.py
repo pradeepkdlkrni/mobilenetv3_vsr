@@ -100,10 +100,38 @@ class ReconstructionModule(nn.Module):
         x = self.final_conv(x)
         return x
 
+
+class ConvGRUCell(nn.Module):
+    def __init__(self, input_dim, hidden_dim, kernel_size=3):
+        super().__init__()
+        padding = kernel_size // 2
+        self.reset_gate = nn.Conv2d(input_dim + hidden_dim, hidden_dim, kernel_size, padding=padding)
+        self.update_gate = nn.Conv2d(input_dim + hidden_dim, hidden_dim, kernel_size, padding=padding)
+        self.out_gate = nn.Conv2d(input_dim + hidden_dim, hidden_dim, kernel_size, padding=padding)
+        self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh()
+
+    def forward(self, x, h_prev):
+        if h_prev is None:
+            h_prev = torch.zeros_like(x)
+        combined = torch.cat([x, h_prev], dim=1)
+        z = self.sigmoid(self.update_gate(combined))
+        r = self.sigmoid(self.reset_gate(combined))
+        h_candidate = self.tanh(self.out_gate(torch.cat([x, r * h_prev], dim=1)))
+        h_new = (1 - z) * h_prev + z * h_candidate
+        return h_new
+
+
 class VideoSuperResolution(nn.Module):
     def __init__(self, scale_factor=4):
         super(VideoSuperResolution, self).__init__()
         self.scale_factor = scale_factor
+        self.lr_fusion = nn.Sequential(
+            nn.Conv2d(6, self.scale_factor * 3, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            ResidualBlock(self.scale_factor * 3),
+            nn.Conv2d(self.scale_factor * 3, 3, kernel_size=3, padding=1)
+        )
 
         self.feature_extractor = MobileNetV3FeatureExtractor(pretrained=True)
         with torch.no_grad():
@@ -115,13 +143,23 @@ class VideoSuperResolution(nn.Module):
             ResidualBlock(feature_channels)
         )
 
-        self.temporal_module = TemporalConsistencyModule(feature_channels)
+        self.temporal_gru = ConvGRUCell(feature_channels, feature_channels)
 
         # Spatial and temporal fusion split
         self.spatial_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
         self.temporal_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
 
         self.reconstruction = ReconstructionModule(feature_channels, scale_factor)
+
+        self.lr_fusion = nn.Sequential(
+            nn.Conv2d(6, FEATURE_CHANNELS, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            ResidualBlock(FEATURE_CHANNELS),
+            nn.Conv2d(FEATURE_CHANNELS, 3, kernel_size=3, padding=1)
+        )
+        nn.init.zeros_(self.lr_fusion[-1].weight)
+        nn.init.zeros_(self.lr_fusion[-1].bias)
+
         self.prev_features = None
 
     def forward(self, x, scale_factor=None, reset_state=True):
@@ -139,7 +177,10 @@ class VideoSuperResolution(nn.Module):
             current_features = self.feature_extractor(current_frame)
             current_features = self.feature_refiner(current_features)
 
-            temporal_out = self.temporal_module(current_features, self.prev_features)
+            if self.prev_features is None:
+                self.prev_features = torch.zeros_like(current_features)
+            temporal_out = self.temporal_gru(current_features, self.prev_features)
+            self.prev_features = temporal_out.detach()
             if self.prev_features is not None:
                 temporal_out = temporal_out + self.prev_features
             self.prev_features = temporal_out.detach()
@@ -153,8 +194,16 @@ class VideoSuperResolution(nn.Module):
             if sr_frame.shape != upsampled_lr.shape:
                upsampled_lr = F.interpolate(upsampled_lr, size=sr_frame.shape[2:], mode='bilinear', align_corners=False)
 			
-            sr_frame = sr_frame + upsampled_lr
+            concat = torch.cat([sr_frame, upsampled_lr], dim=1)
+            sr_frame = self.lr_fusion(concat)
 
+            
+            concat = torch.cat([sr_frame, upsampled_lr], dim=1)
+            alpha = min(1.0, getattr(self, 'current_epoch', 1) / 3.0)
+            sr_learned = self.lr_fusion(concat)
+            sr_frame = alpha * sr_learned + (1 - alpha) * (sr_frame + upsampled_lr)
+            sr_frame = sr_frame + upsampled_lr
             outputs.append(sr_frame)
+    
 
         return torch.stack(outputs, dim=1)

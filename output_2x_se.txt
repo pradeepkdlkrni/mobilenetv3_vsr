@@ -1,0 +1,59 @@
+Creating VSR model with 2x upscaling...
+Train dataset size: 14
+Validation dataset size: 11
+Test dataset size: 14
+LR input shape: torch.Size([4, 5, 3, 64, 112])
+HR target shape: torch.Size([4, 5, 3, 128, 224])
+Scale factor verification: HR height / LR height = 2.0
+Scale factor verification: HR width / LR width = 2.0
+Epoch training time: 31.57 seconds (0.53 minutes)
+Epoch 1/50 | Train Loss: 0.373412 | Val Loss: 0.397645 | Val PSNR: 8.56dB | Time: 52.21s
+New best model saved with PSNR: 8.56dB
+Epoch training time: 30.76 seconds (0.51 minutes)
+Epoch 2/50 | Train Loss: 0.362190 | Val Loss: 0.377632 | Val PSNR: 9.03dB | Time: 51.04s
+New best model saved with PSNR: 9.03dB
+Epoch training time: 31.32 seconds (0.52 minutes)
+Epoch 3/50 | Train Loss: 0.324318 | Val Loss: 0.351675 | Val PSNR: 9.68dB | Time: 50.39s
+New best model saved with PSNR: 9.68dB
+Epoch training time: 28.75 seconds (0.48 minutes)
+Epoch 4/50 | Train Loss: 0.303257 | Val Loss: 0.318418 | Val PSNR: 10.60dB | Time: 47.69s
+New best model saved with PSNR: 10.60dB
+Epoch training time: 28.75 seconds (0.48 minutes)
+Epoch 5/50 | Train Loss: 0.277970 | Val Loss: 0.276760 | Val PSNR: 11.92dB | Time: 47.56s
+New best model saved with PSNR: 11.92dB
+Epoch training time: 32.59 seconds (0.54 minutes)
+Epoch 6/50 | Train Loss: 0.231766 | Val Loss: 0.232427 | Val PSNR: 13.62dB | Time: 52.85s
+New best model saved with PSNR: 13.62dB
+Epoch training time: 31.49 seconds (0.52 minutes)
+Epoch 7/50 | Train Loss: 0.205681 | Val Loss: 0.222194 | Val PSNR: 14.05dB | Time: 54.22s
+New best model saved with PSNR: 14.05dB
+Epoch training time: 34.96 seconds (0.58 minutes)
+Epoch 8/50 | Train Loss: 0.211104 | Val Loss: 0.226359 | Val PSNR: 13.91dB | Time: 54.65s
+Epoch training time: 29.09 seconds (0.48 minutes)
+Epoch 9/50 | Train Loss: 0.206522 | Val Loss: 0.214015 | Val PSNR: 14.35dB | Time: 48.08s
+New best model saved with PSNR: 14.35dB
+Epoch training time: 29.11 seconds (0.49 minutes)
+Epoch 10/50 | Train Loss: 0.198825 | Val Loss: 0.215189 | Val PSNR: 14.32dB | Time: 47.91s
+Epoch training time: 29.10 seconds (0.48 minutes)
+Epoch 11/50 | Train Loss: 0.197342 | Val Loss: 0.214873 | Val PSNR: 14.34dB | Time: 48.14s
+Epoch training time: 29.93 seconds (0.50 minutes)
+Epoch 12/50 | Train Loss: 0.198212 | Val Loss: 0.210305 | Val PSNR: 14.51dB | Time: 49.05s
+New best model saved with PSNR: 14.51dB
+Epoch training time: 29.16 seconds (0.49 minutes)
+Epoch 13/50 | Train Loss: 0.198627 | Val Loss: 0.209114 | Val PSNR: 14.58dB | Time: 48.81s
+New best model saved with PSNR: 14.58dB
+Epoch training time: 32.04 seconds (0.53 minutes)
+Epoch 14/50 | Train Loss: 0.191547 | Val Loss: 0.208446 | Val PSNR: 14.62dB | Time: 54.41s
+New best model saved with PSNR: 14.62dB
+Epoch training time: 33.67 seconds (0.56 minutes)
+Epoch 15/50 | Train Loss: 0.188330 | Val Loss: 0.206508 | Val PSNR: 14.68dB | Time: 55.92s
+New best model saved with PSNR: 14.68dB
+Epoch training time: 31.39 seconds (0.52 minutes)
+Epoch 16/50 | Train Loss: 0.191993 | Val Loss: 0.206023 | Val PSNR: 14.70dB | Time: 50.24s
+New best model saved with PSNR: 14.70dB
+Epoch training time: 31.78 seconds (0.53 minutes)
+Epoch 17/50 | Train Loss: 0.187072 | Val Loss: 0.204578 | Val PSNR: 14.77dB | Time: 54.15s
+New best model saved with PSNR: 14.77dB
+Epoch training time: 31.62 seconds (0.53 minutes)
+Epoch 18/50 | Train Loss: 0.183942 | Val Loss: 0.203150 | Val PSNR: 14.84dB | Time: 54.53s
+New best model saved with PSNR: 14.84dB
