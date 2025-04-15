@@ -1,0 +1,9 @@
+Scale Factor: 4x
+Best PSNR: 19.11dB
+Test PSNR: 22.10dB
+Test SSIM: 0.7612
+Inference time (total): 1.67s
+Average time per frame: 0.0239s
+FPS: 41.82
+Total training time: 8159.35s (135.99min)
+Average epoch time: 163.13s

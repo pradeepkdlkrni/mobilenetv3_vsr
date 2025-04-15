@@ -1,0 +1,106 @@
+diff --git a/.spyproject/config/workspace.ini b/.spyproject/config/workspace.ini
+index 702adbc..12efc35 100644
+--- a/.spyproject/config/workspace.ini
++++ b/.spyproject/config/workspace.ini
+@@ -4,7 +4,7 @@ save_data_on_exit = True
+ save_history = True
+ save_non_project_files = False
+ project_type = 'empty-project-type'
+-recent_files = ['..\\..\\..\\.spyder-py3\\temp.py', 'main.py', 'loss.py', 'utils.py', 'train.py', '__init__.py', 'dataset.py', '..\\..\\..\\.conda\\envs\\mobilenetv3_env\\Lib\\site-packages\\torch\\utils\\data\\dataloader.py']
++recent_files = ['..\\..\\..\\.spyder-py3\\temp.py', 'main.py', 'loss.py', 'utils.py', 'train.py', '__init__.py', 'dataset.py', '..\\..\\..\\.conda\\envs\\mobilenetv3_env\\Lib\\site-packages\\torch\\utils\\data\\dataloader.py', 'model.py']
+ 
+ [main]
+ version = 0.2.0
+diff --git a/__pycache__/model.cpython-39.pyc b/__pycache__/model.cpython-39.pyc
+index d98b196..d20f26a 100644
+Binary files a/__pycache__/model.cpython-39.pyc and b/__pycache__/model.cpython-39.pyc differ
+diff --git a/__pycache__/utils.cpython-39.pyc b/__pycache__/utils.cpython-39.pyc
+index 3372b8d..b0be059 100644
+Binary files a/__pycache__/utils.cpython-39.pyc and b/__pycache__/utils.cpython-39.pyc differ
+diff --git a/checkpoints/best_model.pth b/checkpoints/best_model.pth
+index 44bcea2..535cafe 100644
+Binary files a/checkpoints/best_model.pth and b/checkpoints/best_model.pth differ
+diff --git a/main.py b/main.py
+index 9996189..52315a5 100644
+--- a/main.py
++++ b/main.py
+@@ -41,7 +41,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+ print(f"Using device: {device}")
+ #%% Cell 5
+ # Define hyperparameters
+-BATCH_SIZE = 4
++BATCH_SIZE = 2
+ LEARNING_RATE = 1e-4
+ NUM_EPOCHS = 10
+ SCALE_FACTOR = 8  # Super-resolution scale factor
+diff --git a/model.py b/model.py
+index eb0af8e..0752cfd 100644
+--- a/model.py
++++ b/model.py
+@@ -115,29 +115,33 @@ class ReconstructionModule(nn.Module):
+         
+         # For upscaling from 8×8 to 128×128, we need 4x upscaling
+         # We'll do three PixelShuffle operations: 8×8 -> 16×16 -> 32×32 -> 64×64 -> 128×128
++        # **Upscaling Layers** (Balanced to avoid excessive upscaling)
++        # **Upscaling Layers** (Balanced to avoid excessive upscaling)
+         self.upscale = nn.Sequential(
+-            # First upscale: 8×8 -> 16×16
++            # 32x32 → 64x64
+             nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+             nn.PixelShuffle(2),
+             nn.ReLU(inplace=True),
+-            
+-            # Second upscale: 16×16 -> 32×32
++
++            # 64x64 → 128x128
+             nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+             nn.PixelShuffle(2),
+             nn.ReLU(inplace=True),
+-            
+-            # Third upscale: 32×32 -> 64×64
++
++            # 128x128 → 256x256
+             nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+             nn.PixelShuffle(2),
+             nn.ReLU(inplace=True),
++
++            # **Final Upsample to 1280x720**
++            nn.Upsample(size=(720, 1280), mode='bilinear', align_corners=False),
+             
+-            # Fourth upscale: 64×64 -> 128×128
+-            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS * 4, kernel_size=3, padding=1),
+-            nn.PixelShuffle(2),
+-            nn.ReLU(inplace=True)
++            # **Fix: Ensure Correct Channel Size Before Final Convolution**
++            nn.Conv2d(FEATURE_CHANNELS, FEATURE_CHANNELS, kernel_size=3, padding=1),
++            nn.ReLU(inplace=True),
+         )
+-        
+-        # Final convolution to generate RGB output
++
++        # **Final Convolution (Should Reduce to 3 Channels)**
+         self.final_conv = nn.Conv2d(FEATURE_CHANNELS, 3, kernel_size=3, padding=1)
+     
+     def forward(self, x):
+diff --git a/utils.py b/utils.py
+index e7979b5..7160ded 100644
+--- a/utils.py
++++ b/utils.py
+@@ -96,7 +96,7 @@ train_transform_lr = transforms.Compose([
+ 
+ train_transform_hr = transforms.Compose([
+     transforms.ToPILImage(),
+-    transforms.Resize((64, 64)),  # HR image size (4x larger)
++    transforms.Resize((720, 1280)),  # HR image size (4x larger)
+     transforms.ToTensor()
+ ])
+ 
+@@ -108,7 +108,7 @@ valid_transform_lr = transforms.Compose([
+ 
+ valid_transform_hr = transforms.Compose([
+     transforms.ToPILImage(),
+-    transforms.Resize((64, 64)),  # HR validation size
++    transforms.Resize((720, 1280)),  # HR validation size
+     transforms.ToTensor()
+ ])
+ 

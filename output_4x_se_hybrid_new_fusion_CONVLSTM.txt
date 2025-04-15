@@ -1,0 +1,192 @@
+Creating VSR model with 4x upscaling...
+Train dataset size: 14
+Validation dataset size: 11
+Test dataset size: 14
+LR input shape: torch.Size([4, 5, 3, 64, 112])
+HR target shape: torch.Size([4, 5, 3, 256, 448])
+Scale factor verification: HR height / LR height = 4.0
+Scale factor verification: HR width / LR width = 4.0
+Epoch training time: 94.93 seconds (1.58 minutes)
+Epoch 1/50 | Train Loss: 0.345104 | Val Loss: 0.360367 | Val PSNR: 8.91dB | Time: 167.13s
+New best model saved with PSNR: 8.91dB
+Epoch training time: 90.74 seconds (1.51 minutes)
+Epoch 2/50 | Train Loss: 0.305271 | Val Loss: 0.323010 | Val PSNR: 9.87dB | Time: 139.45s
+New best model saved with PSNR: 9.87dB
+Epoch training time: 89.04 seconds (1.48 minutes)
+Epoch 3/50 | Train Loss: 0.271549 | Val Loss: 0.273698 | Val PSNR: 11.35dB | Time: 139.14s
+New best model saved with PSNR: 11.35dB
+Epoch training time: 95.56 seconds (1.59 minutes)
+Epoch 4/50 | Train Loss: 0.222541 | Val Loss: 0.209126 | Val PSNR: 13.81dB | Time: 155.47s
+New best model saved with PSNR: 13.81dB
+Epoch training time: 100.92 seconds (1.68 minutes)
+Epoch 5/50 | Train Loss: 0.165878 | Val Loss: 0.147611 | Val PSNR: 16.89dB | Time: 150.16s
+New best model saved with PSNR: 16.89dB
+Epoch training time: 89.32 seconds (1.49 minutes)
+Epoch 6/50 | Train Loss: 0.144907 | Val Loss: 0.158691 | Val PSNR: 16.61dB | Time: 138.21s
+Epoch training time: 90.79 seconds (1.51 minutes)
+Epoch 7/50 | Train Loss: 0.147892 | Val Loss: 0.143873 | Val PSNR: 17.20dB | Time: 141.52s
+New best model saved with PSNR: 17.20dB
+Epoch training time: 89.75 seconds (1.50 minutes)
+Epoch 8/50 | Train Loss: 0.130516 | Val Loss: 0.147609 | Val PSNR: 16.92dB | Time: 138.79s
+Epoch training time: 92.16 seconds (1.54 minutes)
+Epoch 9/50 | Train Loss: 0.138214 | Val Loss: 0.148794 | Val PSNR: 16.86dB | Time: 141.22s
+Epoch training time: 90.25 seconds (1.50 minutes)
+Epoch 10/50 | Train Loss: 0.137130 | Val Loss: 0.140982 | Val PSNR: 17.26dB | Time: 139.21s
+New best model saved with PSNR: 17.26dB
+Epoch training time: 90.18 seconds (1.50 minutes)
+Epoch 11/50 | Train Loss: 0.133842 | Val Loss: 0.140274 | Val PSNR: 17.44dB | Time: 139.62s
+New best model saved with PSNR: 17.44dB
+Epoch training time: 92.49 seconds (1.54 minutes)
+Epoch 12/50 | Train Loss: 0.129920 | Val Loss: 0.138450 | Val PSNR: 17.50dB | Time: 141.99s
+New best model saved with PSNR: 17.50dB
+Epoch training time: 90.23 seconds (1.50 minutes)
+Epoch 13/50 | Train Loss: 0.128516 | Val Loss: 0.137637 | Val PSNR: 17.45dB | Time: 139.24s
+Epoch training time: 89.40 seconds (1.49 minutes)
+Epoch 14/50 | Train Loss: 0.124109 | Val Loss: 0.135953 | Val PSNR: 17.57dB | Time: 138.05s
+New best model saved with PSNR: 17.57dB
+Epoch training time: 89.18 seconds (1.49 minutes)
+Epoch 15/50 | Train Loss: 0.125752 | Val Loss: 0.135527 | Val PSNR: 17.64dB | Time: 138.49s
+New best model saved with PSNR: 17.64dB
+Epoch training time: 88.52 seconds (1.48 minutes)
+Epoch 16/50 | Train Loss: 0.127767 | Val Loss: 0.135083 | Val PSNR: 17.63dB | Time: 135.40s
+Epoch training time: 84.90 seconds (1.41 minutes)
+Epoch 17/50 | Train Loss: 0.128521 | Val Loss: 0.134354 | Val PSNR: 17.65dB | Time: 131.17s
+New best model saved with PSNR: 17.65dB
+Epoch training time: 85.00 seconds (1.42 minutes)
+Epoch 18/50 | Train Loss: 0.121788 | Val Loss: 0.132719 | Val PSNR: 17.79dB | Time: 131.56s
+New best model saved with PSNR: 17.79dB
+Epoch training time: 83.93 seconds (1.40 minutes)
+Epoch 19/50 | Train Loss: 0.118700 | Val Loss: 0.131338 | Val PSNR: 17.85dB | Time: 130.39s
+New best model saved with PSNR: 17.85dB
+Epoch training time: 84.68 seconds (1.41 minutes)
+Epoch 20/50 | Train Loss: 0.124089 | Val Loss: 0.130802 | Val PSNR: 17.87dB | Time: 130.76s
+New best model saved with PSNR: 17.87dB
+Epoch training time: 85.80 seconds (1.43 minutes)
+Epoch 21/50 | Train Loss: 0.119630 | Val Loss: 0.129787 | Val PSNR: 17.97dB | Time: 132.20s
+New best model saved with PSNR: 17.97dB
+Epoch training time: 84.65 seconds (1.41 minutes)
+Epoch 22/50 | Train Loss: 0.121519 | Val Loss: 0.128554 | Val PSNR: 18.04dB | Time: 130.99s
+New best model saved with PSNR: 18.04dB
+Epoch training time: 84.43 seconds (1.41 minutes)
+Epoch 23/50 | Train Loss: 0.120638 | Val Loss: 0.127302 | Val PSNR: 18.15dB | Time: 130.89s
+New best model saved with PSNR: 18.15dB
+Epoch training time: 85.34 seconds (1.42 minutes)
+Epoch 24/50 | Train Loss: 0.118961 | Val Loss: 0.126135 | Val PSNR: 18.23dB | Time: 131.55s
+New best model saved with PSNR: 18.23dB
+Epoch training time: 85.73 seconds (1.43 minutes)
+Epoch 25/50 | Train Loss: 0.117152 | Val Loss: 0.125483 | Val PSNR: 18.28dB | Time: 133.16s
+New best model saved with PSNR: 18.28dB
+Epoch training time: 82.69 seconds (1.38 minutes)
+Epoch 26/50 | Train Loss: 0.118023 | Val Loss: 0.123852 | Val PSNR: 18.41dB | Time: 128.60s
+New best model saved with PSNR: 18.41dB
+Epoch training time: 85.01 seconds (1.42 minutes)
+Epoch 27/50 | Train Loss: 0.117985 | Val Loss: 0.123076 | Val PSNR: 18.49dB | Time: 130.53s
+New best model saved with PSNR: 18.49dB
+Epoch training time: 83.78 seconds (1.40 minutes)
+Epoch 28/50 | Train Loss: 0.113442 | Val Loss: 0.122069 | Val PSNR: 18.58dB | Time: 130.04s
+New best model saved with PSNR: 18.58dB
+Epoch training time: 84.39 seconds (1.41 minutes)
+Epoch 29/50 | Train Loss: 0.115103 | Val Loss: 0.121197 | Val PSNR: 18.66dB | Time: 130.79s
+New best model saved with PSNR: 18.66dB
+Epoch training time: 86.20 seconds (1.44 minutes)
+Epoch 30/50 | Train Loss: 0.114536 | Val Loss: 0.119996 | Val PSNR: 18.76dB | Time: 132.77s
+New best model saved with PSNR: 18.76dB
+Epoch training time: 84.99 seconds (1.42 minutes)
+Epoch 31/50 | Train Loss: 0.111797 | Val Loss: 0.119313 | Val PSNR: 18.85dB | Time: 131.44s
+New best model saved with PSNR: 18.85dB
+Epoch training time: 83.58 seconds (1.39 minutes)
+Epoch 32/50 | Train Loss: 0.113367 | Val Loss: 0.118801 | Val PSNR: 18.88dB | Time: 129.48s
+New best model saved with PSNR: 18.88dB
+Epoch training time: 83.16 seconds (1.39 minutes)
+Epoch 33/50 | Train Loss: 0.109760 | Val Loss: 0.118765 | Val PSNR: 18.91dB | Time: 128.57s
+New best model saved with PSNR: 18.91dB
+Epoch training time: 84.64 seconds (1.41 minutes)
+Epoch 34/50 | Train Loss: 0.110217 | Val Loss: 0.118674 | Val PSNR: 18.93dB | Time: 132.24s
+New best model saved with PSNR: 18.93dB
+Epoch training time: 83.82 seconds (1.40 minutes)
+Epoch 35/50 | Train Loss: 0.108577 | Val Loss: 0.118235 | Val PSNR: 18.97dB | Time: 129.44s
+New best model saved with PSNR: 18.97dB
+Epoch training time: 85.24 seconds (1.42 minutes)
+Epoch 36/50 | Train Loss: 0.108857 | Val Loss: 0.117546 | Val PSNR: 19.03dB | Time: 131.22s
+New best model saved with PSNR: 19.03dB
+Epoch training time: 83.91 seconds (1.40 minutes)
+Epoch 37/50 | Train Loss: 0.108721 | Val Loss: 0.116822 | Val PSNR: 19.09dB | Time: 130.14s
+New best model saved with PSNR: 19.09dB
+Epoch training time: 83.40 seconds (1.39 minutes)
+Epoch 38/50 | Train Loss: 0.108519 | Val Loss: 0.116438 | Val PSNR: 19.13dB | Time: 130.29s
+New best model saved with PSNR: 19.13dB
+Epoch training time: 88.66 seconds (1.48 minutes)
+Epoch 39/50 | Train Loss: 0.110747 | Val Loss: 0.116249 | Val PSNR: 19.15dB | Time: 134.35s
+New best model saved with PSNR: 19.15dB
+Epoch training time: 84.61 seconds (1.41 minutes)
+Epoch 40/50 | Train Loss: 0.109017 | Val Loss: 0.116150 | Val PSNR: 19.17dB | Time: 131.97s
+New best model saved with PSNR: 19.17dB
+Epoch training time: 90.08 seconds (1.50 minutes)
+Epoch 41/50 | Train Loss: 0.107273 | Val Loss: 0.116280 | Val PSNR: 19.18dB | Time: 138.00s
+New best model saved with PSNR: 19.18dB
+Epoch training time: 87.15 seconds (1.45 minutes)
+Epoch 42/50 | Train Loss: 0.104957 | Val Loss: 0.116266 | Val PSNR: 19.17dB | Time: 135.27s
+Epoch training time: 87.54 seconds (1.46 minutes)
+Epoch 43/50 | Train Loss: 0.104387 | Val Loss: 0.115761 | Val PSNR: 19.24dB | Time: 137.68s
+New best model saved with PSNR: 19.24dB
+Epoch training time: 87.22 seconds (1.45 minutes)
+Epoch 44/50 | Train Loss: 0.103318 | Val Loss: 0.115815 | Val PSNR: 19.22dB | Time: 133.95s
+Epoch training time: 85.92 seconds (1.43 minutes)
+Epoch 45/50 | Train Loss: 0.102018 | Val Loss: 0.115168 | Val PSNR: 19.28dB | Time: 133.51s
+New best model saved with PSNR: 19.28dB
+Epoch training time: 86.28 seconds (1.44 minutes)
+Epoch 46/50 | Train Loss: 0.106343 | Val Loss: 0.115086 | Val PSNR: 19.28dB | Time: 133.81s
+Epoch training time: 87.19 seconds (1.45 minutes)
+Epoch 47/50 | Train Loss: 0.105288 | Val Loss: 0.114831 | Val PSNR: 19.31dB | Time: 135.41s
+New best model saved with PSNR: 19.31dB
+Epoch training time: 89.08 seconds (1.48 minutes)
+Epoch 48/50 | Train Loss: 0.104766 | Val Loss: 0.114127 | Val PSNR: 19.36dB | Time: 136.63s
+New best model saved with PSNR: 19.36dB
+Epoch training time: 86.31 seconds (1.44 minutes)
+Epoch 49/50 | Train Loss: 0.103008 | Val Loss: 0.113694 | Val PSNR: 19.40dB | Time: 133.89s
+New best model saved with PSNR: 19.40dB
+Epoch training time: 86.64 seconds (1.44 minutes)
+Epoch 50/50 | Train Loss: 0.101999 | Val Loss: 0.114289 | Val PSNR: 19.36dB | Time: 134.88s
+
+Training Performance Summary:
+Total training time: 6782.90 seconds (113.05 minutes)
+Average time per epoch: 135.61 seconds (2.26 minutes)
+Fastest epoch: 128.57 seconds
+Slowest epoch: 167.13 seconds
+Loading best model for testing...
+Test Results (4x) - Average PSNR: 22.69dB, Average SSIM: 0.7627
+
+Measuring inference performance...
+Warming up...
+Measuring inference time...
+Batch 1: 1 sequences × 5 frames = 5 frames in 0.1238s (40.40 FPS)
+Batch 2: 1 sequences × 5 frames = 5 frames in 0.1065s (46.93 FPS)
+Batch 3: 1 sequences × 5 frames = 5 frames in 0.0801s (62.41 FPS)
+Batch 4: 1 sequences × 5 frames = 5 frames in 0.0832s (60.06 FPS)
+Batch 5: 1 sequences × 5 frames = 5 frames in 0.0798s (62.67 FPS)
+Batch 6: 1 sequences × 5 frames = 5 frames in 0.0824s (60.66 FPS)
+Batch 7: 1 sequences × 5 frames = 5 frames in 0.0677s (73.86 FPS)
+Batch 8: 1 sequences × 5 frames = 5 frames in 0.0678s (73.76 FPS)
+Batch 9: 1 sequences × 5 frames = 5 frames in 0.0689s (72.60 FPS)
+Batch 10: 1 sequences × 5 frames = 5 frames in 0.0647s (77.33 FPS)
+Batch 11: 1 sequences × 5 frames = 5 frames in 0.0671s (74.48 FPS)
+Batch 12: 1 sequences × 5 frames = 5 frames in 0.0613s (81.51 FPS)
+Batch 13: 1 sequences × 5 frames = 5 frames in 0.0737s (67.83 FPS)
+Batch 14: 1 sequences × 5 frames = 5 frames in 0.0643s (77.79 FPS)
+
+Inference Performance Summary:
+Total frames processed: 70
+Total inference time: 1.0914 seconds
+Average time per frame: 15.59 ms
+Frames per second (FPS): 64.14
+Input resolution: 112×64
+Processing speed: 0.46 Megapixels/second
+lr_paths_batch type: <class 'list'>
+len(lr_paths_batch): 5
+lr_paths_batch[0]: ('F://vimeo_septuplet_full//Arranged_small\\test\\lr\\00001_0003\\frame_00001.png',)
+lr_paths_batch type: <class 'list'>
+len(lr_paths_batch): 5
+lr_paths_batch[0]: ('F://vimeo_septuplet_full//Arranged_small\\test\\lr\\00001_0035\\frame_00001.png',)
+lr_paths_batch type: <class 'list'>
+len(lr_paths_batch): 5
+lr_paths_batch[0]: ('F://vimeo_septuplet_full//Arranged_small\\test\\lr\\00001_0048\\frame_00001.png',)

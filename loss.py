@@ -4,6 +4,13 @@ import torch.nn.functional as F
 from torchvision import models
 from torchvision.models import vgg16, VGG16_Weights
 
+def compute_motion_weight(current_frame, prev_frame):
+    # Absolute difference in luminance space
+    diff = torch.mean(torch.abs(current_frame - prev_frame), dim=1, keepdim=True)
+    norm_diff = diff / (diff.max() + 1e-6)
+
+    return norm_diff + 1.0  # Ensure weights are ≥1.0
+
 
 class CharbonnierLoss(nn.Module):
     def __init__(self, eps=1e-6):
@@ -130,24 +137,45 @@ class CombinedLoss(nn.Module):
         self.temp_weight = temp_weight
         
     def forward(self, output, target, prev_output=None):
-        # Reshape if needed for perceptual loss
         b, t, c, h, w = output.shape
-        
-        # Ensure dimensions match between output and target
+
+        # Resize if needed
         if output.shape[3:] != target.shape[3:]:
-            output_reshaped = output.view(-1, c, h, w)
-            output_resized = F.interpolate(output_reshaped, size=target.shape[3:], mode='bilinear', align_corners=False)
-            output = output_resized.view(b, t, c, target.shape[3], target.shape[4])
-            
-        rec = self.rec_loss(output, target)
-        
-        # Reshape for perceptual loss
-        output_perc = output.view(-1, c, output.shape[3], output.shape[4])
-        target_perc = target.view(-1, c, target.shape[3], target.shape[4])
-        
-        perc = self.perc_loss(output_perc, target_perc)
-        temp = self.temp_loss(output, target, prev_output)
-        
-        total_loss = self.rec_weight * rec + self.perc_weight * perc + self.temp_weight * temp
-        
+            output = F.interpolate(output.view(-1, c, h, w), size=target.shape[3:], mode='bilinear', align_corners=False)
+            output = output.view(b, t, c, target.shape[3], target.shape[4])
+
+        rec_loss = 0.0
+        temp_loss = 0.0
+        perc_loss = 0.0
+
+        for i in range(t):
+            out_frame = output[:, i]
+            tgt_frame = target[:, i]
+
+            if i > 0:
+                motion_weight = compute_motion_weight(tgt_frame, target[:, i - 1])
+            else:
+                motion_weight = torch.ones_like(out_frame[:, :1])  # no motion for first frame
+
+            # === Weighted Reconstruction Loss ===
+            rec = self.rec_loss(out_frame, tgt_frame)
+            rec = (motion_weight * rec).mean()
+            rec_loss += rec
+
+            # === Perceptual Loss ===
+            if self.perc_weight > 0:
+                out_feat = self.perc_loss.feature_extractor(out_frame)
+                tgt_feat = self.perc_loss.feature_extractor(tgt_frame)
+                perc = F.l1_loss(out_feat, tgt_feat)
+                perc_loss += perc
+
+            # === Temporal Loss ===
+            if self.temp_weight > 0 and i > 0:
+                temp_loss += self.temp_loss(out_frame, tgt_frame, prev_output=output[:, i - 1])
+
+        rec_loss /= t
+        perc_loss /= max(1, t - 1)
+        temp_loss /= max(1, t - 1)
+
+        total_loss = self.rec_weight * rec_loss + self.perc_weight * perc_loss + self.temp_weight * temp_loss
         return total_loss

@@ -7,6 +7,57 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 
+class CBAMBlock(nn.Module):
+    def __init__(self, channels, reduction_ratio=16, kernel_size=7):
+        super().__init__()
+        # Channel Attention
+        self.channel_mlp = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(channels, channels // reduction_ratio, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels // reduction_ratio, channels, 1, bias=False)
+        )
+        self.sigmoid_channel = nn.Sigmoid()
+
+        # Spatial Attention
+        self.spatial = nn.Sequential(
+            nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # Channel Attention
+        avg_out = self.channel_mlp(x)
+        ch_att = self.sigmoid_channel(avg_out)
+        x = x * ch_att
+
+        # Spatial Attention
+        max_pool = torch.max(x, dim=1, keepdim=True)[0]
+        mean_pool = torch.mean(x, dim=1, keepdim=True)
+        spatial_input = torch.cat([max_pool, mean_pool], dim=1)
+        sp_att = self.spatial(spatial_input)
+
+        return x * sp_att
+
+class ConvLSTMCell(nn.Module):
+    def __init__(self, input_dim, hidden_dim, kernel_size=3):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv = nn.Conv2d(input_dim + hidden_dim, 4 * hidden_dim, kernel_size, padding=padding)
+
+    def forward(self, x, state):
+        h_cur, c_cur = state
+        combined = torch.cat([x, h_cur], dim=1)
+        conv_output = self.conv(combined)
+        cc_i, cc_f, cc_o, cc_g = torch.split(conv_output, conv_output.shape[1] // 4, dim=1)
+        i = torch.sigmoid(cc_i)
+        f = torch.sigmoid(cc_f)
+        o = torch.sigmoid(cc_o)
+        g = torch.tanh(cc_g)
+        c_next = f * c_cur + i * g
+        h_next = o * torch.tanh(c_next)
+        return h_next, (h_next, c_next)
+    
 class SEBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -162,14 +213,22 @@ class VideoSuperResolution(nn.Module):
             ResidualBlock(feature_channels)
         )
 
-        self.temporal_gru = ConvGRUCell(feature_channels, feature_channels)
+        #self.temporal_gru = ConvGRUCell(feature_channels, feature_channels)
+        self.temporal_lstm = ConvLSTMCell(feature_channels, feature_channels)
+        self.temporal_state = None
 
         # Spatial and temporal fusion split
         self.spatial_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
         self.temporal_fusion = nn.Conv2d(feature_channels, feature_channels, kernel_size=1)
 
+        
+        self.temporal_fusion = nn.Sequential(
+            nn.Conv2d(feature_channels, feature_channels, kernel_size=1),
+            nn.Conv2d(feature_channels, feature_channels, kernel_size=3, padding=1),
+            nn.Conv2d(feature_channels, feature_channels, kernel_size=5, padding=2)
+        )
         self.reconstruction = nn.Sequential(
-            *[nn.Sequential(ResidualBlock(feature_channels), SEBlock(feature_channels)) for _ in range(4)],
+            *[nn.Sequential(ResidualBlock(feature_channels), CBAMBlock(feature_channels)) for _ in range(4)],
             *[ResidualBlock(feature_channels) for _ in range(4)],
             nn.Conv2d(feature_channels, 3 * scale_factor * scale_factor, kernel_size=3, padding=1),
             nn.PixelShuffle(scale_factor)
@@ -195,21 +254,32 @@ class VideoSuperResolution(nn.Module):
 
         if reset_state:
             self.prev_features = None
+            self.temporal_state = None
 
         for t in range(seq_len):
             current_frame = x[:, t, :, :, :]
             current_features = self.feature_extractor(current_frame)
             current_features = self.feature_refiner(current_features)
 
-            if self.prev_features is None:
-                self.prev_features = torch.zeros_like(current_features)
-            temporal_out = self.temporal_gru(current_features, self.prev_features)
+            #if self.prev_features is None:
+                #self.prev_features = torch.zeros_like(current_features)
+            #temporal_out = self.temporal_gru(current_features, self.prev_features)
+            
+            if self.temporal_state is None:
+                h_cur = torch.zeros(current_features.size(0), current_features.size(1), current_features.size(2), current_features.size(3), device=current_features.device)
+                c_cur = torch.zeros_like(h_cur)
+                self.temporal_state = (h_cur, c_cur)
+
+            temporal_out, (h_next, c_next) = self.temporal_lstm(current_features, self.temporal_state)
+            self.temporal_state = (h_next.detach(), c_next.detach())
+            
             self.prev_features = temporal_out.detach()
             if self.prev_features is not None:
                 temporal_out = temporal_out + self.prev_features
             self.prev_features = temporal_out.detach()
 
-            fused_features = self.spatial_fusion(current_features) + self.temporal_fusion(temporal_out)
+            fused_temporal = self.temporal_fusion(temporal_out)
+            fused_features = self.spatial_fusion(current_features) + fused_temporal
 
             # Add residual skip from LR input
             upsampled_lr = F.interpolate(current_frame, scale_factor=scale_factor, mode='bilinear', align_corners=False)
