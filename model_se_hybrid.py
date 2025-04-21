@@ -6,6 +6,37 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
+from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights
+
+# Paste in your model_se_hybrid.py (top with other imports)
+import math
+import torch.nn.init as init
+
+class TinyTransformerBlock(nn.Module):
+    def __init__(self, dim, heads=4):
+        super().__init__()
+        self.heads = heads
+        self.scale = (dim // heads) ** -0.5
+
+        self.to_qkv = nn.Conv2d(dim, dim * 3, kernel_size=1)
+        self.proj = nn.Conv2d(dim, dim, kernel_size=1)
+
+        self.norm = nn.BatchNorm2d(dim)
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        qkv = self.to_qkv(x).reshape(b, 3, self.heads, c // self.heads, h * w)
+        q, k, v = qkv[:, 0], qkv[:, 1], qkv[:, 2]
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        out = (attn @ v).reshape(b, c, h, w)
+
+        out = self.proj(out)
+        out = self.norm(out + x)  # Residual
+        return out
+
+
 
 class CBAMBlock(nn.Module):
     def __init__(self, channels, reduction_ratio=16, kernel_size=7):
@@ -82,7 +113,7 @@ class MobileNetV3FeatureExtractor(nn.Module):
     def __init__(self, pretrained=True):
         super(MobileNetV3FeatureExtractor, self).__init__()
 
-        mobilenet = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT if pretrained else None)
+        mobilenet = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT if pretrained else None)
         self.features = nn.Sequential(*list(mobilenet.features.children())[:6])
 
     def forward(self, x):
@@ -207,7 +238,8 @@ class VideoSuperResolution(nn.Module):
         with torch.no_grad():
             dummy = torch.randn(1, 3, 64, 64)
             feature_channels = self.feature_extractor(dummy).shape[1]
-
+        # Use the actual number of channels dynamically
+        self.temporal_transformer = TinyTransformerBlock(feature_channels)
         self.feature_refiner = nn.Sequential(
             ResidualBlock(feature_channels),
             ResidualBlock(feature_channels)
@@ -280,6 +312,7 @@ class VideoSuperResolution(nn.Module):
 
             fused_temporal = self.temporal_fusion(temporal_out)
             fused_features = self.spatial_fusion(current_features) + fused_temporal
+            fused_features = self.temporal_transformer(fused_features)
 
             # Add residual skip from LR input
             upsampled_lr = F.interpolate(current_frame, scale_factor=scale_factor, mode='bilinear', align_corners=False)

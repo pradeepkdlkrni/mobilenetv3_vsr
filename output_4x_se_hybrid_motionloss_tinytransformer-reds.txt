@@ -1,0 +1,8 @@
+Creating VSR model with 4x upscaling...
+Train dataset size: 216
+Validation dataset size: 24
+Test dataset size: 30
+LR input shape: torch.Size([4, 5, 3, 180, 320])
+HR target shape: torch.Size([4, 5, 3, 720, 1280])
+Scale factor verification: HR height / LR height = 4.0
+Scale factor verification: HR width / LR width = 4.0
